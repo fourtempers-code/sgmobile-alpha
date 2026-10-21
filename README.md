@@ -17,4 +17,4 @@ Selected build: `alpha100-github-pilot-v1-20261021T175651Z`.
 
 This repository contains selected app artifacts and public dependency sources. The development repository remains private. GitHub Pages is public; this is not password-protected or restricted to invited testers.
 
-Deployment is manual from main. The workflow verifies the complete app inventory and uploads only `site/`; a push alone does not deploy. The site link becomes available after the first deployment completes.
+Deployment is manual from main. The workflow verifies the complete app inventory and uploads only `site/`; a push alone does not deploy. The site is deployed. Computer checks pass for installation, course loading, saving/backups, orientation and offline reopening/saving; actual-host iPhone acceptance is pending before community invitations.
