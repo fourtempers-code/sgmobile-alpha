@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SimGolf Mobile">
+<meta name="theme-color" content="#142219">
+<link rel="apple-touch-icon" href="icons/simgolf-mobile.png">
+<link rel="icon" type="image/png" href="icons/simgolf-mobile.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>SimGolf</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111; }
+  body { overflow: hidden; }
+  #build-header {
+    position:fixed;z-index:100;top:env(safe-area-inset-top,0px);
+    left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);
+    box-sizing:border-box;padding:2px 6px;background:#142219ed;color:#fff;
+    display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 12px;
+    font:11px/18px system-ui,sans-serif;pointer-events:none;
+  }
+  #build-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-align:left}
+  #mobile-status{font-size:12px;text-align:left}
+
+  #game-stage {
+    width: 100%; height: 100vh; height: 100dvh; box-sizing: border-box;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+             env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  canvas { flex: none; display: block; image-rendering: pixelated; touch-action: none; }
+</style>
+</head>
+<body>
+<div id="build-header"><div id="build-label" title="SimGolf Mobile Alpha version 1.0 · alpha100-github-pilot-v1-20261021T175651Z">Alpha version 1.0 · alpha100-github-pilot-v1-20261021T175651Z</div><div id="mobile-status" hidden></div></div>
+<div id="game-stage"><canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas></div>
+<script>
+  var Module = { canvas: document.getElementById('canvas'), fsDebug: true, apiTrace: /apitrace/.test(location.search), noVideos: /novideos/.test(location.search) };
+  Module.localFiles = true;
+  Module.buildInfo = Object.freeze({version: 'alpha1.0.0', id: 'alpha100-github-pilot-v1-20261021T175651Z'});
+  Module.headerHeight=function(){return document.getElementById('build-header').getBoundingClientRect().bottom;};
+  new ResizeObserver(function(){dispatchEvent(new Event('simgolf-header-resize'));}).observe(document.getElementById('build-header'));
+  // Original Windows strings are byte-oriented Windows-1252, including the
+  // Simoleon sign and smart punctuation. UTF-8 decoding loses those bytes.
+  var gameTextDecoder = new TextDecoder('windows-1252');
+  Module.readGameText = function(pointer, limit) {
+    var heap=Module.HEAPU8, start=Number(pointer), end=start;
+    if(!heap||!Number.isInteger(start)||start<=0||start>=heap.length)return '';
+    var stop=Math.min(heap.length,start+(limit||4096));
+    while(end<stop&&heap[end])end++;
+    return gameTextDecoder.decode(heap.subarray(start,end)).replace(/§/g,'$');
+  };
+  // Internal controlled resize API: queue a request; never enter running WASM
+  // from a browser event. The course-render boundary consumes the latest one.
+  Module.requestViewport = function (width, height) {
+    if (!Number.isInteger(width) || !Number.isInteger(height)) return 0;
+    var seq = (Module.viewportRequest?.seq || 0) + 1;
+    Module.viewportRequest = {width:width, height:height, seq:seq};
+    return seq;
+  };
+  // Presentation only: retain the engine's native world/UI coordinates. SDL
+  // maps browser input through the canvas's actual CSS rectangle. Never resize
+  // the backing surface here; changing it also needs an engine resize contract.
+  (function () {
+    var stage = document.getElementById('game-stage');
+    var nativeWidth = 800, nativeHeight = 600, pending = false;
+    function fit() {
+      pending = false;
+      var css = getComputedStyle(stage);
+      var width = stage.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight);
+      var height = stage.clientHeight - parseFloat(css.paddingTop) - parseFloat(css.paddingBottom);
+      if (width <= 0 || height <= 0) return;
+      // Original menu/dialog artwork occupies the800x600 UI plane even when
+      // the retained map buffers are tall/wide. Fit and centre that plane;
+      // clip stale world pixels beyond it, keeping inverse canvas input exact.
+      var legacy=(Module.mobileUI||Module.atTitle)&&!Module.mapPresentation?.course;
+      var scale = Math.min(width / (legacy?800:nativeWidth), height / (legacy?600:nativeHeight));
+      if (Module.mobileUI && Module.mapPresentation?.course) {
+        var view=Module.mapPresentation;
+        scale = view.baseScale * view.appliedZoom / (view.nativeZoom/4);
+      }
+      Module.canvas.style.width = nativeWidth * scale + 'px';
+      Module.canvas.style.height = nativeHeight * scale + 'px';
+      Module.canvas.style.transform=legacy?'translate('+((nativeWidth-800)*scale/2)+'px,'+((nativeHeight-600)*scale/2)+'px)':'';
+      Module.canvas.style.clipPath=legacy?'inset(0 '+((nativeWidth-800)/nativeWidth*100)+'% '+((nativeHeight-600)/nativeHeight*100)+'% 0)':'';
+      Module.uiPresentation=legacy?{width:800,height:600,scale:scale}:null;
+      Module.canvasScale = scale;
+    }
+    function schedule() { if (!pending) { pending = true; requestAnimationFrame(fit); } }
+    Module.fitCanvas = function (width, height) {
+      nativeWidth = width; nativeHeight = height; fit();
+    };
+    Module.refreshCanvasPresentation = fit;
+    addEventListener('resize', schedule);
+    addEventListener('orientationchange', schedule);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', schedule);
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(schedule).observe(stage);
+    schedule();
+  })();
+  // Mobile map layer: DOM events only queue work. Native code consumes it at
+  // the ordinary message pump, never by reentering suspended JSPI calls.
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var active = params.get('mobile') === '1' || (Module.localFiles && params.get('mobile') !== '0') || (params.get('mobile') !== '0' && matchMedia('(pointer: coarse)').matches);
+    Module.mobileMap = active;
+    Module.mobileUI = active && params.get('legacyui') !== '1';
+    Module.menuQueue = [];
+    Module.mapMode = 0;
+    Module.gameTextQueue = [];
+    Module.sendGameText = function(text) {
+      if(!Module.mobileState?.textInput){Module.gameTextError='Open a name field in the game first.';return false;}
+      if(/[^\x20-\x7e]/.test(text)){Module.gameTextError='Use letters, numbers and standard punctuation.';return false;}
+      if(Module.gameTextQueue.length+text.length>4096){Module.gameTextError='Wait for the current text to finish, then try again.';return false;}
+      for(var i=0;i<text.length;i++)Module.gameTextQueue.push(text.charCodeAt(i));
+      Module.mobileTextPending=Module.gameTextQueue.length;Module.gameTextError='';return true;
+    };
+    Module.touchQueue = [];
+    var canvas = Module.canvas, stage = document.getElementById('game-stage');
+    var gesture = null, debounce, measuring = false, fingers = new Map(), pinch = null, blocked = false;
+    Module.mapPresentation = {course:false, zoom:1, appliedZoom:1, nativeZoom:4, baseScale:1};
+    // Use the physical screen's short CSS side, not the orientation-dependent
+    // fitting ratio. Magnification is a uniform close-up of the rendered world;
+    // the engine keeps its genuine native zoom values and projection/picking.
+    function baseScale() {
+      return Math.max(1, Math.min(screen.width,screen.height)) / 600;
+    }
+    Module.setMapZoom = function(value) {
+      var view=Module.mapPresentation;
+      if(!Number.isFinite(value))return;
+      if(Module.aimMode)Module.setAimMode(false);
+      if(Module.lotMode)Module.setLotMode(false);
+      var constructing=Module.mobileUI&&Module.mobileState?.constructing;
+      var minimum=constructing?1:.25;
+      view.zoom=Math.max(minimum,Math.min(3,value));view.changed=Date.now();
+      if(constructing&&value<1)Module.mapZoomNotice={text:'Build: 1× minimum',until:Date.now()+2400};
+      var nativeZoom=view.zoom>=1?4:view.zoom>=.5?2:1;
+      Module.menuQueue=Module.menuQueue.filter(function(c){return c[0]!==11;});
+      if(nativeZoom===view.nativeZoom&&!view.pendingNative)view.appliedZoom=view.zoom;
+      view.serial=(view.serial||0)+1;view.pendingNative=nativeZoom;Module.menuQueue.push([11,nativeZoom]);
+      Module.refreshCanvasPresentation();schedule();
+    };
+    Module.updateMapPresentation = function(course) {
+      var view=Module.mapPresentation;
+      var nativeZoom=Module.mobileState?.zoom||4,changed=false;
+      if(view.pendingNative&&view.pendingNative===view.nativeAck&&view.serial===view.nativeAckSerial){
+        nativeZoom=view.nativeAck;delete view.pendingNative;view.appliedZoom=view.zoom;changed=true;
+      }
+      if(!view.pendingNative&&nativeZoom!==view.nativeZoom){
+        // Original keyboard/fallback commands remain valid inputs to the same
+        // scale. A queued gesture already supplied its desired overall zoom.
+        if(!changed)view.zoom=Math.max(.25,Math.min(3,view.zoom*nativeZoom/view.nativeZoom));
+        view.nativeZoom=nativeZoom;view.appliedZoom=view.zoom;changed=true;
+      }
+      var ownershipChanged=view.course!==!!course||view.mobileUI!==Module.mobileUI;
+      if(!changed&&!ownershipChanged)return;
+      view.course=!!course;view.mobileUI=Module.mobileUI;
+      if(ownershipChanged){Module.cancelMapGesture();if(!course&&Module.aimMode)Module.setAimMode(false);}
+      Module.refreshCanvasPresentation();schedule();
+    };
+    function queue(type, x, y, distance) {
+      var q = Module.touchQueue;
+      var event = [type, x|0, y|0, distance|0, measuring|0];
+      if ((type===0||type===2||type===8) && q.length && q[q.length-1][0] === type) q[q.length-1] = event;
+      else if (q.length < 128) q.push(event);
+      else { q.length = 0; q.push([4,0,0,0,0]); }
+    }
+    var directions=new Map();
+    function releaseDirections(){directions.forEach(function(v){queue(7,v,0,0);});directions.clear();}
+    Module.cancelMapGesture = function () {
+      gesture = null;
+      pinch=null;blocked=fingers.size>0;
+      Module.lotPreview=null;Module.lotPending=false;
+      Module.touchQueue.length = 0;
+      queue(4,0,0,0);
+      releaseDirections();
+    };
+    Module.setMapMode = function(mode) {if(Module.lotMode)Module.setLotMode(false);if(Module.aimMode)Module.setAimMode(false);Module.cancelMapGesture();measuring=mode;Module.mapMode=mode;if(mode===0)queue(5,0,0,0);};
+    Module.keyboardInput = function(key,character){
+      if(Module.mobileState?.textInput&&character){Module.gameTextQueue.push(character);Module.mobileTextPending=Module.gameTextQueue.length;}
+      else queue(6,key,character,0);
+    };
+    function nativePoint(e) {
+      var r = canvas.getBoundingClientRect();
+      return [(e.clientX-r.left)*canvas.width/r.width, (e.clientY-r.top)*canvas.height/r.height];
+    }
+    var aimReticle=document.createElement('div');aimReticle.id='map-aim-reticle';aimReticle.setAttribute('aria-hidden','true');
+    aimReticle.style.cssText='position:fixed;z-index:25;pointer-events:none;width:26px;height:26px;border:2px solid white;border-radius:50%;box-shadow:0 0 0 2px #15291d;transform:translate(-50%,-50%);display:none';
+    aimReticle.textContent='+';aimReticle.style.textAlign='center';aimReticle.style.font='24px/26px monospace';aimReticle.style.color='white';document.body.appendChild(aimReticle);
+    Module.aimMode=false;Module.aimTarget=null;Module.aimSerial=0;
+    Module.refreshAimReticle=function(){
+      var t=Module.aimTarget,visible=Module.aimMode&&Module.mobileState?.course&&Module.mobileState?.shotTurn&&t;
+      aimReticle.style.display=visible?'block':'none';if(!visible)return;
+      var r=canvas.getBoundingClientRect();aimReticle.style.left=(r.left+t.x*r.width/canvas.width)+'px';aimReticle.style.top=(r.top+t.y*r.height/canvas.height)+'px';
+    };
+    Module.setAimTarget=function(x,y){
+      if(!Module.aimMode||Module.shotPending)return;
+      Module.aimSerial++;Module.aimAck=null;
+      var r=canvas.getBoundingClientRect(),v=stage.getBoundingClientRect(),margin=16;
+      var left=Math.max(0,(Math.max(0,v.left)+margin-r.left)*canvas.width/r.width),right=Math.min(canvas.width-1,(Math.min(innerWidth,v.right)-margin-r.left)*canvas.width/r.width);
+      var top=Math.max(0,(Math.max(0,v.top,Module.headerHeight())+margin-r.top)*canvas.height/r.height),bottom=Math.min(canvas.height-1,(Math.min(innerHeight,v.bottom)-margin-r.top)*canvas.height/r.height);
+      Module.aimTarget={x:Math.max(left,Math.min(right,x)),y:Math.max(top,Math.min(bottom,y))};
+      Module.refreshAimTarget();Module.refreshAimReticle();
+    };
+    Module.refreshAimTarget=function(){var t=Module.aimTarget;if(Module.aimMode&&t)queue(8,t.x,t.y,Module.aimSerial);};
+    Module.setAimMode=function(enabled){
+      Module.cancelMapGesture();Module.aimMode=!!enabled&&!!Module.mobileState?.shotTurn&&!Module.mobileState?.photoActive;measuring=Module.aimMode?3:0;Module.mapMode=measuring;
+      if(Module.aimMode){var r=stage.getBoundingClientRect(),t=nativePoint({clientX:r.left+r.width/2,clientY:r.top+r.height/2});Module.setAimTarget(t[0],t[1]);}
+      else Module.aimTarget=null;
+      Module.refreshAimReticle();
+    };
+    Module.aimCanShoot=function(){return !!Module.aimTarget&&Module.aimAck?.serial===Module.aimSerial;};
+    Module.requestShot=function(){
+      if(!Module.mobileState?.course||Module.mobileState?.photoActive||!Module.mobileState?.shotReady||!Module.aimMode||!Module.aimCanShoot()||Module.shotPending)return false;
+      var t=Module.aimTarget;gesture=null;pinch=null;blocked=fingers.size>0;queue(9,t.x,t.y,Module.aimSerial);Module.shotPending=true;return true;
+    };
+    Module.lotMode=false;Module.lotTarget=null;Module.lotSerial=0;
+    Module.lotCanStart=function(){return !pinch&&!fingers.size&&!blocked;};
+    Module.setLotTarget=function(x,y){
+      if(!Module.lotMode||Module.lotPending)return;
+      var r=canvas.getBoundingClientRect(),v=stage.getBoundingClientRect(),margin=18;
+      var left=Math.max(0,(Math.max(0,v.left)+margin-r.left)*canvas.width/r.width),right=Math.min(canvas.width-1,(Math.min(innerWidth,v.right)-margin-r.left)*canvas.width/r.width);
+      var panel=document.getElementById('mobile-lot-controls'),mapBottom=panel&&!panel.hidden?Math.min(innerHeight,v.bottom,panel.getBoundingClientRect().top-12):Math.min(innerHeight,v.bottom);
+      var top=Math.max(0,(Math.max(0,v.top,Module.headerHeight())+margin-r.top)*canvas.height/r.height),bottom=Math.min(canvas.height-1,(mapBottom-margin-r.top)*canvas.height/r.height);
+      Module.lotSerial++;Module.lotPreview=null;Module.lotTarget={x:Math.round(Math.max(left,Math.min(right,x))),y:Math.round(Math.max(top,Math.min(bottom,y)))};Module.refreshLotTarget();
+    };
+    Module.centreLotTarget=function(){var r=stage.getBoundingClientRect(),panel=document.getElementById('mobile-lot-controls'),bottom=panel&&!panel.hidden?Math.min(r.bottom,panel.getBoundingClientRect().top-12):r.bottom,top=Math.max(r.top,Module.headerHeight()),p=nativePoint({clientX:r.left+r.width/2,clientY:top+Math.max(0,bottom-top)/2});Module.setLotTarget(p[0],p[1]);};
+    function lotViewStamp(){var r=canvas.getBoundingClientRect();return JSON.stringify([canvas.width,canvas.height,r.left,r.top,r.width,r.height,Module.mobileState?.object,Module.mobileState?.variation?.selected??-1]);}
+    Module.refreshLotTarget=function(){
+      if(Module.lotMode&&Module.lotView!==lotViewStamp()){Module.cancelMapGesture();Module.lotView=lotViewStamp();Module.centreLotTarget();return;}
+      var t=Module.lotTarget;if(Module.lotMode&&t&&!Module.lotPending&&Module.lotPreview?.serial!==Module.lotSerial&&!Module.touchQueue.some(e=>e[0]===11))queue(11,t.x,t.y,Module.lotSerial);};
+    Module.setLotMode=function(enabled){
+      Module.cancelMapGesture();Module.lotMode=!!enabled&&[1,2,4,5,6,7,8,9,10,11,12,13,14,16,19].includes(Module.mobileState?.object)&&Module.mobileState?.course;measuring=Module.lotMode?4:0;Module.mapMode=measuring;Module.lotView=lotViewStamp();
+      if(Module.lotMode){var r=stage.getBoundingClientRect(),t=nativePoint({clientX:r.left+r.width/2,clientY:r.top+r.height/2});Module.setLotTarget(t[0],t[1]);}else Module.lotTarget=null;
+    };
+    Module.requestLot=function(){
+      var p=Module.lotPreview,t=Module.lotTarget;
+      if(!Module.lotMode||Module.lotPending||!p?.valid||p.serial!==Module.lotSerial||!t)return false;
+      gesture=null;pinch=null;blocked=fingers.size>0;queue(12,t.x,t.y,Module.lotSerial);Module.lotPending=true;return true;
+    };
+    Module.lotEdgeActive=function(){return !!(Module.lotMode&&gesture?.lotStart&&fingers.size===1&&!pinch&&!blocked&&!Module.lotPending&&!document.hidden);};
+    addEventListener('resize',function(){if(Module.aimMode)Module.setAimMode(false);if(Module.lotMode)Module.setLotMode(false);});
+    // Edge scrolling belongs to an active Aim drag, never a released/locked
+    // target. Native polling applies the ordinary bounded camera transform.
+    Module.aimEdgeActive=function(){return !!(Module.aimMode&&gesture?.aimStart&&fingers.size===1&&!pinch&&!blocked&&!Module.shotPending&&!document.hidden&&!Module.mobileState?.photoActive&&Module.mobileState?.shotTurn);};
+    setInterval(function(){
+      var lot=Module.lotEdgeActive();if(!lot&&!Module.aimEdgeActive())return;
+      var t=lot?Module.lotTarget:Module.aimTarget,r=canvas.getBoundingClientRect(),v=stage.getBoundingClientRect();
+      if(!t||!r.width||!r.height)return;
+      var x=r.left+t.x*r.width/canvas.width,y=r.top+t.y*r.height/canvas.height;
+      var left=Math.max(0,r.left,v.left),right=Math.min(innerWidth,r.right,v.right);
+      var top=Math.max(0,r.top,v.top,Module.headerHeight()),bottom=Math.min(innerHeight,r.bottom,v.bottom),edge=36,direction=0;
+      if(lot){var panel=document.getElementById('mobile-lot-controls');if(panel&&!panel.hidden)bottom=Math.min(bottom,panel.getBoundingClientRect().top-12);}
+      if(x-left<edge)direction|=1;else if(right-x<edge)direction|=4;
+      if(y-top<edge)direction|=2;else if(bottom-y<edge)direction|=8;
+      if(direction){if(lot){Module.lotPreview=null;queue(13,direction,0,Module.lotSerial);}else{Module.aimAck=null;queue(10,direction,0,Module.aimSerial);}}
+    },110);
+    function pointer(e) {
+      var mapMouse=e.pointerType==='mouse'&&Module.mobileUI&&Module.mobileState?.course&&(Module.mobileState?.roundActive||Module.lotMode||Module.mapMode===2);
+      if (!active || (e.pointerType!=='touch'&&!mapMouse)) return;
+      if(mapMouse&&e.type==='pointerdown'&&e.button!==0)return;
+      if(mapMouse&&!Module.aimMode&&!Module.lotMode&&e.type==='pointermove'&&!gesture){var q=nativePoint(e);queue(0,q[0],q[1],0);}
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (e.type === 'pointerdown') {
+        fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+        canvas.setPointerCapture(e.pointerId);
+        if(fingers.size===2 && Module.mobileUI && Module.mapPresentation.course) {
+          var points=Array.from(fingers.values());
+          var distance=Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y);
+          if(Module.aimMode)Module.setAimMode(false);
+          if(Module.lotMode)Module.setLotMode(false);
+          Module.cancelMapGesture();
+          pinch={distance:Math.max(1,distance),zoom:Module.mapPresentation.zoom};return;
+        }
+        if (fingers.size!==1 || blocked) return;
+        var p = nativePoint(e);
+        gesture = {id:e.pointerId,x:e.clientX,y:e.clientY,dist:0,point:p,sent:false};
+        if(Module.lotMode){gesture.lotStart={...Module.lotTarget};if(mapMouse)Module.setLotTarget(p[0],p[1]);}
+        if(Module.aimMode){gesture.aimStart={...Module.aimTarget};if(mapMouse)Module.setAimTarget(p[0],p[1]);}
+        // Defer the original press until a move/release, so a two-finger start
+        // cannot paint a tile before the second finger claims pinch ownership.
+      } else {
+        if(!fingers.has(e.pointerId))return;
+        fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+        if(pinch) {
+          if(e.type==='pointermove'&&fingers.size===2) {
+            var points=Array.from(fingers.values());
+            Module.setMapZoom(pinch.zoom*Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y)/pinch.distance);
+          }
+          if(e.type!=='pointermove'){fingers.delete(e.pointerId);pinch=null;blocked=fingers.size>0;schedule();}
+          return;
+        }
+        if (gesture && e.pointerId === gesture.id) {
+        var p = nativePoint(e);
+        gesture.dist = Math.max(gesture.dist,Math.hypot(e.clientX-gesture.x,e.clientY-gesture.y));
+        if(gesture.lotStart&&Module.lotMode){
+          if(e.type!=='pointercancel')Module.setLotTarget(mapMouse?p[0]:gesture.lotStart.x+(p[0]-gesture.point[0])*1.15,mapMouse?p[1]:gesture.lotStart.y+(p[1]-gesture.point[1])*1.15);
+        }else if(gesture.aimStart&&Module.aimMode){
+          if(e.type!=='pointercancel')Module.setAimTarget(mapMouse?p[0]:gesture.aimStart.x+(p[0]-gesture.point[0])*1.15,mapMouse?p[1]:gesture.aimStart.y+(p[1]-gesture.point[1])*1.15);
+        }else{
+          if(!gesture.sent&&e.type!=='pointercancel'){queue(1,gesture.point[0],gesture.point[1],0);gesture.sent=true;}
+          queue(e.type === 'pointermove' ? 2 : e.type === 'pointerup' ? 3 : 4,p[0],p[1],gesture.dist);
+        }
+        if (e.type !== 'pointermove') gesture = null;
+        }
+        if(e.type!=='pointermove'){fingers.delete(e.pointerId);if(!fingers.size)blocked=false;}
+      }
+    }
+    ['mousedown','mouseup','mousemove','click','dblclick'].forEach(function(type){canvas.addEventListener(type,function(e){if(Module.mobileUI&&Module.mobileState?.course&&(Module.mobileState?.roundActive||Module.lotMode||Module.mapMode===2)){e.preventDefault();e.stopImmediatePropagation();}},{capture:true,passive:false});});
+    ['pointerdown','pointermove','pointerup','pointercancel'].forEach(function(type){canvas.addEventListener(type,pointer,{capture:true,passive:false});});
+    canvas.addEventListener('wheel',function(e){
+      if(!Module.mobileUI||!Module.mobileState?.course)return;
+      e.preventDefault();e.stopImmediatePropagation();Module.cancelMapGesture();
+      var delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?innerHeight:1);
+      Module.setMapZoom(Module.mapPresentation.zoom*Math.pow(1.25,-delta/100));
+    },{capture:true,passive:false});
+    ['keydown','keyup','keypress'].forEach(function(type){addEventListener(type,function(e){
+      var code=e.code||('Key'+String(e.key).toUpperCase()),vk={KeyW:38,KeyA:37,KeyS:40,KeyD:39,ArrowUp:38,ArrowLeft:37,ArrowDown:40,ArrowRight:39}[code];
+      if(!vk)return;
+      if(type==='keyup'&&directions.has(code)){e.preventDefault();e.stopImmediatePropagation();queue(7,vk,0,0);directions.delete(code);return;}
+      var field=e.target?.closest?.('input,textarea,select,[contenteditable="true"]');
+      if(!Module.mobileUI||!Module.mobileState?.course||Module.mobileState?.textInput||field||e.ctrlKey||e.metaKey||e.altKey)return;
+      e.preventDefault();e.stopImmediatePropagation();
+      if(type==='keydown'&&!directions.has(code)){if(Module.aimMode)Module.setAimMode(false);directions.set(code,vk);queue(7,vk,1,0);}
+    },true);});
+    // SDL also installs legacy touch listeners. Suppress their mouse emulation;
+    // otherwise a pan can also become an original yardage/construction drag.
+    ['touchstart','touchmove','touchend','touchcancel'].forEach(function(type){canvas.addEventListener(type,function(e){if(active){e.preventDefault();e.stopImmediatePropagation();}},{capture:true,passive:false});});
+    if (active && !Module.mobileUI) {
+      var button = document.createElement('button');
+      button.textContent = 'Measure'; button.type='button'; button.id='map-measure';
+      button.setAttribute('aria-pressed','false');
+      button.style.cssText='position:fixed;right:max(8px,env(safe-area-inset-right));top:max(8px,env(safe-area-inset-top));min-width:74px;min-height:44px;z-index:10;background:#222c;color:white;border:1px solid #aaa;border-radius:8px;font:14px sans-serif';
+      button.addEventListener('click',function(){Module.cancelMapGesture();measuring=!measuring;button.setAttribute('aria-pressed',String(measuring));button.textContent=measuring?'Measure: on':'Measure';});
+      document.body.appendChild(button);
+      var pan = document.createElement('button');
+      pan.textContent='Pan';pan.type='button';pan.id='map-pan';
+      pan.style.cssText=button.style.cssText+';right:calc(max(8px,env(safe-area-inset-right)) + 82px)';
+      pan.addEventListener('click',function(){Module.cancelMapGesture();measuring=false;button.setAttribute('aria-pressed','false');button.textContent='Measure';queue(5,0,0,0);});
+      document.body.appendChild(pan);
+    }
+    function target() {
+      var css=getComputedStyle(stage), w=stage.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight), h=stage.clientHeight-parseFloat(css.paddingTop)-parseFloat(css.paddingBottom);
+      if(w<1||h<1)return null;
+      var ratio=w/h, width=800, height=600;
+      if(Module.mobileUI) {
+        var view=Module.mapPresentation,scale=baseScale()*view.appliedZoom/(view.nativeZoom/4);
+        Module.mapPresentation.baseScale=baseScale();
+        width=Math.min(1600,Math.max(800,Math.ceil(w/scale/2)*2));
+        height=Math.min(1920,Math.max(600,Math.ceil(h/scale/2)*2));
+        // One side is always at its original minimum; retain the proven native
+        // allocation contract, including unusual/small desktop debug windows.
+        if(width>800&&height>600)width=800;
+        return {width:width,height:height,cssWidth:w,cssHeight:h,scale:scale};
+      }
+      if(ratio>=4/3)width=Math.min(1600,Math.max(800,Math.round(600*ratio/2)*2));
+      else height=Math.min(1920,Math.max(600,Math.round(800/ratio/2)*2));
+      return {width:width,height:height,cssWidth:w,cssHeight:h};
+    }
+    function request() {
+      if(!active || document.hidden || pinch || (window.visualViewport && visualViewport.scale !== 1))return;
+      var next=target(); if(!next)return;
+      if(fingers.size) {
+        if(Module.adaptiveTarget&&next.cssWidth===Module.adaptiveTarget.cssWidth&&next.cssHeight===Module.adaptiveTarget.cssHeight)return;
+        Module.cancelMapGesture();fingers.clear();blocked=false;
+      }
+      Module.adaptiveTarget=next;
+      Module.refreshCanvasPresentation();
+      var old=Module.viewportRequest;
+      if(!old || old.width!==next.width || old.height!==next.height) {
+        Module.cancelMapGesture();Module.requestViewport(next.width,next.height);
+      }
+    }
+    function schedule(){clearTimeout(debounce);debounce=setTimeout(request,180);}
+    addEventListener('resize',schedule);addEventListener('orientationchange',schedule);
+    function cancelAll(){Module.cancelMapGesture();fingers.clear();blocked=false;}
+    addEventListener('blur',cancelAll);
+    document.addEventListener('visibilitychange',function(){cancelAll();schedule();});
+    if(window.visualViewport)visualViewport.addEventListener('resize',schedule);
+    if(typeof ResizeObserver!=='undefined')new ResizeObserver(schedule).observe(stage);
+    schedule();
+  })();
+
+</script>
+<script>
+  // Prefetch: the game opens its files one at a time and waits for each fetch,
+  // so the ~1,000 files read before the main menu (and ~700 more when a course
+  // loads) cost a round trip each. preload.txt lists them in the order a first
+  // run reads them; they're fetched a few at a time from page start, and the
+  // game's fetch of a listed file takes the prefetched copy. ?noprefetch turns
+  // it off.
+  (function () {
+    if (Module.localFiles || /noprefetch/.test(location.search)) return;
+    var realFetch = window.fetch.bind(window);
+    var ready = new Map(), taken = new Set(), list = [], next = 0, inflight = 0;
+    var MAX_INFLIGHT = 8, MAX_AHEAD = 400;
+    function get(url) {
+      inflight++;
+      return realFetch(url).then(function (r) {
+        return r.ok ? r.arrayBuffer().then(function (b) { return new Response(b); }) : r;
+      }).catch(function () { return realFetch(url); }).finally(function () { inflight--; pump(); });
+    }
+    function pump() {
+      while (inflight < MAX_INFLIGHT && ready.size < MAX_AHEAD && next < list.length) {
+        var url = list[next++];
+        if (!taken.has(url)) ready.set(url, get(url));
+      }
+    }
+    window.fetch = function (input, init) {
+      if (typeof input === 'string' && input.lastIndexOf('game/', 0) === 0) {
+        taken.add(input);
+        var p = ready.get(input);
+        if (p) { ready.delete(input); pump(); return p; }
+      }
+      return realFetch(input, init);
+    };
+    realFetch('preload.txt').then(function (r) { return r.ok ? r.text() : ''; }).then(function (text) {
+      list = text.split('\n').filter(Boolean).map(function (n) {
+        return 'game/' + n.split('/').map(encodeURIComponent).join('/');
+      });
+      pump();
+    }).catch(function () {});
+  })();
+</script>
+<script>
+  // Crash reports: the last console lines plus the error go to the dev server
+  // (tools/boxedwine/serve.mjs appends them to build/browser.log).
+  (function () {
+    if (Module.localFiles) return;
+    var lines = [], sent = 0;
+    ['log', 'warn', 'error'].forEach(function (k) {
+      var orig = console[k];
+      console[k] = function () {
+        var msg = Array.prototype.map.call(arguments, String).join(' ');
+        if (!/^fetch /.test(msg)) { lines.push(k + ' ' + msg); if (lines.length > 300) lines.shift(); }
+        return orig.apply(console, arguments);
+      };
+    });
+    function report(what) {
+      if (sent++ > 5) return;
+      var body = location.href + '\n' + navigator.userAgent + '\n' + what + '\n---- recent console\n' + lines.join('\n');
+      try { navigator.sendBeacon('/log', body); } catch (e) {}
+    }
+    addEventListener('error', function (e) { report('error: ' + e.message + '\n' + (e.error && e.error.stack || '')); });
+    addEventListener('unhandledrejection', function (e) { report('unhandledrejection: ' + (e.reason && (e.reason.stack || e.reason))); });
+    Module.onAbort = function (what) { report('abort: ' + what + '\n' + new Error().stack); };
+  })();
+</script>
+<script src="local-install.js"></script><script src="offline.js"></script>
+<script src="autosave.js"></script>
+<script src="mobile-menu.js"></script>
+<script async type="text/javascript" src="golf.js"></script>
+</body>
+</html>

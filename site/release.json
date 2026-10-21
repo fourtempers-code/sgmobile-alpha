@@ -1,0 +1,211 @@
+{
+  "schema": 1,
+  "build": "alpha100-github-pilot-v1-20261021T175651Z",
+  "files": [
+    {
+      "path": "7zz.umd.js",
+      "bytes": 83122,
+      "sha256": "163ddd968550dccf3da53afd0384f03868b33e5cb146a76080e6368721a75d08"
+    },
+    {
+      "path": "7zz.wasm",
+      "bytes": 1651931,
+      "sha256": "e16c6997e2eaa89575c0dd1f305074be629c3f4d87246244d37fd19debc8a285"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1073,
+      "sha256": "f426c8ea4334afa7f12c957d9f2890705c9cde7e278178cdabaef6078dde0ef5"
+    },
+    {
+      "path": "README.txt",
+      "bytes": 3554,
+      "sha256": "22f44b1c359c7b2a7df4c29e71317cb85724980024ea3a19aea0574c6b55314f"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.txt",
+      "bytes": 2894,
+      "sha256": "0f02cf4fd4cacd02c113ac71628547b83c62a5314de9473510425fe6144bea7a"
+    },
+    {
+      "path": "apple-touch-icon.png",
+      "bytes": 1720280,
+      "sha256": "02fdb92b469ebe8ebae97479f291b5f233eb039053ecc0601360e78b9ecaf4e5"
+    },
+    {
+      "path": "autosave.js",
+      "bytes": 14417,
+      "sha256": "4d2ca4ce6909b4b6d23b77cf53e323a15e158567062954b2224ce26185d412a8"
+    },
+    {
+      "path": "compatibility.json",
+      "bytes": 204,
+      "sha256": "da2a969275376d7e109635ebcf1c8003d833446d1da2cd3ea8aa2fe4bd315d7f"
+    },
+    {
+      "path": "golf.data",
+      "bytes": 1255883,
+      "sha256": "3c52803ed730fa3663fab1a0e6c4decbcd34ca10e79e25b5ffbc006e548de6a2"
+    },
+    {
+      "path": "golf.html",
+      "bytes": 30584,
+      "sha256": "129e59eec665d7388a3ac5850a1bea6b9763b17d31e84facc36b3bcde7aab97c"
+    },
+    {
+      "path": "golf.js",
+      "bytes": 443709,
+      "sha256": "7cabdac48f180afe6fe0d20027c2b134fb6b714dd271867517a1a80e494af2d5"
+    },
+    {
+      "path": "golf.wasm",
+      "bytes": 3323463,
+      "sha256": "7302f482419ed5c4e6d5459e2707eaafccc9adc2982fadc091486321825b4cd1"
+    },
+    {
+      "path": "icons/discord-symbol.svg",
+      "bytes": 1306,
+      "sha256": "eb3bf5a2e8b9f9aa39c1b1d38aeaa7c2997084567634c55f4141aa39cf426cec"
+    },
+    {
+      "path": "icons/simgolf-mobile.png",
+      "bytes": 1720280,
+      "sha256": "02fdb92b469ebe8ebae97479f291b5f233eb039053ecc0601360e78b9ecaf4e5"
+    },
+    {
+      "path": "index.html",
+      "bytes": 305,
+      "sha256": "da1afecba60c3985cc0348aaf354da2a06478015326bcd7ebe6cb737540d4b8a"
+    },
+    {
+      "path": "install-worker.js",
+      "bytes": 23958,
+      "sha256": "878581c6c234545b07462a3ffdef90ab6ed6f1a1456f463fb5648985ce769f28"
+    },
+    {
+      "path": "jgld-nops.json",
+      "bytes": 35223,
+      "sha256": "7c1a6d35f29b4484e2f881aa8a9e10bccf91c657885f5c95d5bdfaa7e6d478af"
+    },
+    {
+      "path": "licenses/7zip-source.txt",
+      "bytes": 6341,
+      "sha256": "7b7022cccdee7bddd07f5fd847161e33551cec411e9c9967c14008ee36d5ce3f"
+    },
+    {
+      "path": "licenses/7zip.txt",
+      "bytes": 1932,
+      "sha256": "3d52f98857cb4b34e4ed4c637135884a65d0fa94aef7f992df4b149b6055e23a"
+    },
+    {
+      "path": "licenses/comic-neue.txt",
+      "bytes": 4390,
+      "sha256": "7c38a22e5878e60fe423360553e63dd7be23d29f1f60336034935dbfc96e8320"
+    },
+    {
+      "path": "licenses/compiler-rt.txt",
+      "bytes": 16708,
+      "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d"
+    },
+    {
+      "path": "licenses/emscripten.txt",
+      "bytes": 5093,
+      "sha256": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86"
+    },
+    {
+      "path": "licenses/lgpl-2.1.txt",
+      "bytes": 26419,
+      "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95"
+    },
+    {
+      "path": "licenses/libcxx.txt",
+      "bytes": 16703,
+      "sha256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b"
+    },
+    {
+      "path": "licenses/libcxxabi.txt",
+      "bytes": 16706,
+      "sha256": "e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c"
+    },
+    {
+      "path": "licenses/liberation-fonts.txt",
+      "bytes": 4414,
+      "sha256": "93fed46019c38bbe566b479d22148e2e8a1e85ada614accb0211c37b2c61c19b"
+    },
+    {
+      "path": "licenses/musl.txt",
+      "bytes": 6196,
+      "sha256": "b870108ec5e7790e9f9919064f1b9421d62d5f9b0e6c230c6adf7ea2da62e97b"
+    },
+    {
+      "path": "licenses/rsa-md5.txt",
+      "bytes": 930,
+      "sha256": "905a8ab3d0b83c80b31ec6d12c5a7a8843ca2fd8ad6efde9653c1ae67be9b4f4"
+    },
+    {
+      "path": "licenses/stb-truetype.txt",
+      "bytes": 1160,
+      "sha256": "f7e9ed73812898371959e214ac4d82df98152c658f2270f7e9766d833d155e71"
+    },
+    {
+      "path": "licenses/unrar.txt",
+      "bytes": 1961,
+      "sha256": "bf6343bbe251ec177a0e8a371516c58350daac298eba6883cf978f456fae3d89"
+    },
+    {
+      "path": "licenses/unshield.txt",
+      "bytes": 1091,
+      "sha256": "3aaecd6f4440a1456c7d6fee4fe82a4d47af55646ae3daa1c806c717a9385bba"
+    },
+    {
+      "path": "licenses/zlib.txt",
+      "bytes": 1002,
+      "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2"
+    },
+    {
+      "path": "local-install.js",
+      "bytes": 25737,
+      "sha256": "266b6d10af5df9548bb97a0909cbde08faaf3bf27b0bd5fabb90cc314702fa37"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 386,
+      "sha256": "d3688fc3321672087fb2cfa5a1050c4e52f3fe30ae9613aa36afaca5871f1cf7"
+    },
+    {
+      "path": "mobile-menu.js",
+      "bytes": 105781,
+      "sha256": "b851f415131f9f51b01e189f0080f8aee4fbaa4b32b761d43bc0f1c2ba9c09e8"
+    },
+    {
+      "path": "offline.js",
+      "bytes": 3042,
+      "sha256": "0c9bc53fb5627b52dea0f4b525abf23a23f7a1f09b2513ef8e2226e2aee490dd"
+    },
+    {
+      "path": "service-worker.js",
+      "bytes": 4009,
+      "sha256": "b0e72ed75783c73b0f37c9f62435599037980d67d2f625b37f9492aeb51ee50b"
+    },
+    {
+      "path": "sources/7z-wasm-1.2.0-source.tar.gz",
+      "bytes": 763183,
+      "sha256": "0ca44328d043031ad3e2b750d18f94f13126cdbaeacfc8243fefaa331dff487a"
+    },
+    {
+      "path": "sources/7zip-24.09-source.7z",
+      "bytes": 1498342,
+      "sha256": "a33569eed0ce628fb9ceb9f46ac257d3f36b3966471667e65ba01878673c9faa"
+    },
+    {
+      "path": "unshield.js",
+      "bytes": 63486,
+      "sha256": "9f4eebf3c82c3fba27d549a4aef263a2733a436689f8063ef2fbc18cc06f8149"
+    },
+    {
+      "path": "unshield.wasm",
+      "bytes": 67260,
+      "sha256": "5948d6d5abd89b8218cab2446b3a50ccb0fc0dd8a9f9def2401a0682d03a0e9c"
+    }
+  ]
+}
