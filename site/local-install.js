@@ -56,6 +56,12 @@
     #local-install .install-link-arrow{font-size:19px;opacity:.85}
     #local-install .install-donate:active,#local-install .install-community:active{transform:translateY(2px);box-shadow:none}
     @media(max-width:360px){#local-install .install-donate,#local-install .install-community{grid-template-columns:36px minmax(0,1fr);gap:10px;padding:13px}#local-install .install-heart{width:36px;height:36px}#local-install .install-link-arrow{display:none}}
+    #local-install .install-setup{margin:0 0 20px;padding:15px 16px;border:1px solid #a9ba8a;border-radius:15px;background:#eff3df;text-align:left;font-size:14px}
+    #local-install .install-setup h2{margin:0 0 8px;font-size:17px;color:#174d2e}
+    #local-install .install-setup p{margin:8px 0}
+    #local-install .install-setup ol{margin:10px 0;padding-left:22px}
+    #local-install .install-setup li{margin:10px 0;overflow-wrap:anywhere}
+    #local-install .install-setup a{font-weight:700}
     #local-install .install-identity{overflow-wrap:anywhere;font-size:11px}
     @media(max-height:500px){#local-install .install-brand{margin-bottom:14px}#local-install .install-brand img{width:60px;height:60px;border-radius:15px}#local-install .install-card{padding:20px}}
   `;
@@ -74,7 +80,16 @@
   var picker = document.createElement('input'); picker.id = 'local-install-files'; picker.type = 'file'; picker.multiple = true; picker.accept = '.iso,.bin,.img,.mdf,.exe,.zip,.7z,.rar'; picker.setAttribute('aria-label', 'Select your original game files');
   var pickLabel = node('label', ''); pickLabel.className = 'install-picker'; pickLabel.htmlFor = picker.id;
   pickLabel.append(node('strong', 'Choose Game Files'), node('span', 'Select your disc image and compatible game executable'), picker);
-  var help = node('p', 'Use your original disc image (.iso) and the supported v1.02 game executable (.exe). Import happens locally; the game files are not included.'); help.className = 'minor';
+  var quickGuide = node('section', ''); quickGuide.className = 'install-setup'; quickGuide.setAttribute('aria-labelledby', 'local-install-setup-heading');
+  var setupHeading = node('h2', 'Quick setup'); setupHeading.id = 'local-install-setup-heading';
+  var setupFiles = node('ol', '');
+  var discStep = node('li', ''); discStep.append(node('strong', 'Game disc or archive: '), document.createTextNode('a SimGolf .iso file, or a .zip / .7z archive containing the disc image. See '));
+  var archiveLink = node('a', 'Internet Archive'); archiveLink.href = 'https://archive.org/details/sid-meiers-sim-golf-1641547'; archiveLink.target = '_blank'; archiveLink.rel = 'noopener noreferrer'; discStep.append(archiveLink, document.createTextNode('.'));
+  var exeStep = node('li', ''); exeStep.append(node('strong', 'Compatible no-CD executable: '), document.createTextNode('the supported v1.02 .exe file. See '));
+  var executableLink = node('a', 'Abandonware DOS'); executableLink.href = 'https://www.abandonwaredos.com/abandonware-game.php?abandonware=Sid+Meier%27s+SimGolf&gid=2317'; executableLink.target = '_blank'; executableLink.rel = 'noopener noreferrer'; exeStep.append(executableLink, document.createTextNode('.'));
+  setupFiles.append(discStep, exeStep);
+  quickGuide.append(setupHeading, node('p', 'Save both files in the Files app on your device.'), setupFiles, node('p', 'When both files are ready, tap Choose Game Files above and select them to begin.'));
+  var help = node('p', 'The installer checks file compatibility before starting. Your game files are installed locally.'); help.className = 'minor';
   var bar = document.createElement('progress'); bar.max = 1; bar.value = 0; bar.hidden = true; bar.setAttribute('aria-label', 'Game file import progress');
   var play = node('button', 'Play'); play.id = 'local-install-play'; play.hidden = true;
   var replace = node('button', 'Import replacement files'); replace.hidden = true;
@@ -95,7 +110,7 @@
   var guide = node('a', 'Setup & supported files'); guide.href = new URL('README.txt', base).href; guide.target = '_blank'; guide.rel = 'noopener';
   var notices = node('a', 'Third-party notices & source'); notices.href = new URL('THIRD_PARTY_NOTICES.txt', base).href; notices.target = '_blank'; notices.rel = 'noopener';
   var links = node('p', ''); links.append(guide, document.createTextNode(' · '), notices);
-  card.append(eyebrow, donate, community, heading, intro, pickLabel, help, info, bar, play, replace, cancel, privacy, note);
+  card.append(eyebrow, donate, community, heading, intro, pickLabel, quickGuide, help, info, bar, play, replace, cancel, privacy, note);
   footer.append(links, identity); box.append(brand, card, footer); root.append(box); document.body.append(root);
   for (var type of ['pointerdown','pointerup','pointermove','mousedown','mouseup','click','touchstart','touchmove','touchend','wheel','keydown','keyup','keypress']) root.addEventListener(type, function (e) { e.stopPropagation(); });
 
@@ -156,7 +171,7 @@
     return {name:name, top:top, meta:meta, images:images};
   }
   function installedView() {
-    picker.hidden = true; play.hidden = false; replace.hidden = false; cancel.hidden = true; bar.hidden = true;
+    quickGuide.hidden = true; picker.hidden = true; play.hidden = false; replace.hidden = false; cancel.hidden = true; bar.hidden = true;
     status('installed', 'Your original game files are ready.');
   }
   async function discover() {
@@ -179,7 +194,7 @@
     } catch (e) { play.disabled = false; replace.disabled = false; picker.disabled = false; status('error', messageError(e), true); }
   }
   play.onclick = start;
-  replace.onclick = function () { picker.hidden = false; selected = []; cancel.hidden = false; play.hidden = true; replace.hidden = true; status('selecting', 'Choose replacement files. Your current installation and saves will be preserved.'); };
+  replace.onclick = function () { quickGuide.hidden = false; picker.hidden = false; selected = []; cancel.hidden = false; play.hidden = true; replace.hidden = true; status('selecting', 'Choose replacement files. Your current installation and saves will be preserved.'); };
   cancel.onclick = function () {
     if (worker) { worker.terminate(); worker = null; }
     selected = []; picker.disabled = false; picker.value = ''; bar.hidden = true;

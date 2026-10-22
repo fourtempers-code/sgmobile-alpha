@@ -8,7 +8,7 @@ Players must provide their own supported original game files; installation happe
 
 Use Safari on iPhone and follow the installer instructions. After installation, add the app to your Home Screen. Export save backups regularly. This is alpha software with incomplete device, edition and long-session coverage.
 
-Selected build: `alpha100-github-pilot-v1-20261021T175651Z`.
+Selected build: `alpha100-setup-guide-v3-20261022T143751Z`.
 
 - [Setup, supported inputs, backups and known limitations](site/README.txt)
 - [Licenses and dependency sources](site/THIRD_PARTY_NOTICES.txt)

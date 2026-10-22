@@ -1,21 +1,14 @@
 {
   "repository": "fourtempers-code/sgmobile-alpha",
   "prospective_url": "https://fourtempers-code.github.io/sgmobile-alpha/",
-  "build": "alpha100-github-pilot-v1-20261021T175651Z",
+  "build": "alpha100-setup-guide-v3-20261022T143751Z",
   "site_files": 43,
-  "bytes": 12960830,
-  "public_repository_proposed": false,
-  "publishing_performed": true,
+  "bytes": 12962802,
+  "public_repository_proposed": true,
+  "publishing_performed": false,
   "approval_required": false,
   "manual_deployment_only": true,
   "private_development_repository_unchanged": true,
-  "public_repository_created": true,
-  "site_url": "https://fourtempers-code.github.io/sgmobile-alpha/",
-  "version_label": "Alpha version 1.0",
-  "deployed_commit": "4cc2206ab98a8198ea77640377088d18e99f5b66",
-  "workflow": "https://github.com/fourtempers-code/sgmobile-alpha/actions/runs/39648554450",
-  "hosted_browser_assertions": 42,
-  "served_app_files_verified": 42,
-  "non_runtime_nojekyll_marker_served": false,
-  "actual_host_iphone_acceptance_pending": true
+  "authorization": "Maintainer requests updated welcome guide on the already authorized GitHub site",
+  "version_label": "Alpha version 1.0"
 }

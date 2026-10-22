@@ -33,12 +33,12 @@
 </style>
 </head>
 <body>
-<div id="build-header"><div id="build-label" title="SimGolf Mobile Alpha version 1.0 · alpha100-github-pilot-v1-20261021T175651Z">Alpha version 1.0 · alpha100-github-pilot-v1-20261021T175651Z</div><div id="mobile-status" hidden></div></div>
+<div id="build-header"><div id="build-label" title="SimGolf Mobile Alpha version 1.0 · alpha100-setup-guide-v3-20261022T143751Z">Alpha version 1.0 · alpha100-setup-guide-v3-20261022T143751Z</div><div id="mobile-status" hidden></div></div>
 <div id="game-stage"><canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas></div>
 <script>
   var Module = { canvas: document.getElementById('canvas'), fsDebug: true, apiTrace: /apitrace/.test(location.search), noVideos: /novideos/.test(location.search) };
   Module.localFiles = true;
-  Module.buildInfo = Object.freeze({version: 'alpha1.0.0', id: 'alpha100-github-pilot-v1-20261021T175651Z'});
+  Module.buildInfo = Object.freeze({version: 'alpha1.0.0', id: 'alpha100-setup-guide-v3-20261022T143751Z'});
   Module.headerHeight=function(){return document.getElementById('build-header').getBoundingClientRect().bottom;};
   new ResizeObserver(function(){dispatchEvent(new Event('simgolf-header-resize'));}).observe(document.getElementById('build-header'));
   // Original Windows strings are byte-oriented Windows-1252, including the
