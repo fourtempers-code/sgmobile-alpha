@@ -16,7 +16,7 @@ alone does not establish compatibility. We cannot supply original game files
 or guarantee other editions work. On an incompatible-input error, stop and
 report your edition/version; do not obtain a replacement from this website.
 ISO+EXE installation has local/maintainer acceptance. ZIP/7z/RAR selection is
-present but not yet independently accepted on iPhone. Intro videos are deferred.
+present but not yet independently accepted on iPhone. The original opening plays from your imported local files. Use ?novideos only to skip movies for diagnostics.
 
 DEVICE
 Maintainer-tested device: iPhone15 Pro Max, reported iOS27.0.1, Safari/Home Screen.
@@ -52,7 +52,9 @@ This is alpha software with incomplete device/input-edition and long-session
 coverage. SimFoto/year-end/tournament/progression edge cases remain test areas.
 Storage quota, eviction, forced termination and multi-window write conflicts
 are not guaranteed recovered by the controlled desktop failure tests.
-Welcome-screen polish, optional videos and broader archive acceptance are pending.
+Use only one game window/tab at a time: simultaneous clients can overwrite
+each other's save inventory. Keep exported backups. Original opening video is
+now supported locally; broader phone playback and archive acceptance are pending.
 
 PRIVACY
 The host receives ordinary app-resource requests. Original game files and saves

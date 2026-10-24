@@ -95,7 +95,7 @@
   var replace = node('button', 'Import replacement files'); replace.hidden = true;
   var cancel = node('button', 'Cancel import'); cancel.hidden = true;
   var privacy = node('p', 'Your game files stay on this device.'); privacy.className = 'install-privacy';
-  var note = node('p', 'Keep backups of your saves. Clearing this site’s browser data removes local files. Intro-video conversion is not available in this alpha.'); note.className = 'minor';
+  var note = node('p', 'Keep backups of your saves. Clearing this site’s browser data removes local files. The opening movie plays from your local game files.'); note.className = 'minor';
   var footer = node('div', ''); footer.className = 'install-footer';
   var donate = node('a', ''); donate.className = 'install-donate'; donate.setAttribute('aria-label', 'Donate to this project on Ko-fi');
   donate.href = 'https://ko-fi.com/sgmobile'; donate.target = '_blank'; donate.rel = 'noopener noreferrer';
@@ -110,7 +110,7 @@
   var guide = node('a', 'Setup & supported files'); guide.href = new URL('README.txt', base).href; guide.target = '_blank'; guide.rel = 'noopener';
   var notices = node('a', 'Third-party notices & source'); notices.href = new URL('THIRD_PARTY_NOTICES.txt', base).href; notices.target = '_blank'; notices.rel = 'noopener';
   var links = node('p', ''); links.append(guide, document.createTextNode(' · '), notices);
-  card.append(eyebrow, donate, community, heading, intro, pickLabel, quickGuide, help, info, bar, play, replace, cancel, privacy, note);
+  card.append(eyebrow, donate, community, heading, intro, pickLabel, info, bar, quickGuide, help, play, replace, cancel, privacy, note);
   footer.append(links, identity); box.append(brand, card, footer); root.append(box); document.body.append(root);
   for (var type of ['pointerdown','pointerup','pointermove','mousedown','mouseup','click','touchstart','touchmove','touchend','wheel','keydown','keyup','keypress']) root.addEventListener(type, function (e) { e.stopPropagation(); });
 
@@ -187,6 +187,7 @@
   async function start() {
     if (!active || settled) return;
     play.disabled = true; replace.disabled = true; picker.disabled = true;
+    if(!Module.noVideos)Module.prepareBinkAudio?.();
     try {
       storage = active.top; gameDirs.clear(); Module.localInstall.generation = active.name;
       if (navigator.storage.persist) await navigator.storage.persist().catch(function () {});
@@ -202,6 +203,7 @@
   };
   picker.onchange = function () {
     if (!picker.files.length || worker) return;
+    if(!Module.noVideos)Module.prepareBinkAudio?.();
     for (var file of picker.files) if (!selected.some(function (old) { return old.name === file.name && old.size === file.size; })) selected.push(file);
     picker.value = ''; picker.disabled = true; cancel.hidden = false; bar.hidden = false; bar.value = 0;
     status('importing', 'Checking your files…');
@@ -225,7 +227,7 @@
   saveRoot.setAttribute('role', 'dialog'); saveRoot.setAttribute('aria-modal', 'true');
   var saveBox = node('div', ''), saveHeading = node('h1', 'Save files'), saveInfo = node('p', 'Download a backup or import an original save.');
   var saveInput = document.createElement('input'); saveInput.type = 'file'; saveInput.accept = '.sve'; saveInput.multiple = true; saveInput.id = 'local-save-import'; saveInput.setAttribute('aria-label', 'Import saved games');
-  var saveList = node('div', ''), saveClose = node('button', 'Back to game'); saveClose.onclick = function () { saveRoot.hidden = true; };
+  var saveList = node('div', ''), saveClose = node('button', 'Back to game'); saveClose.id = 'local-save-close'; saveClose.onclick = function () { saveRoot.hidden = true; };
   saveBox.append(saveHeading, saveInfo, saveInput, saveList, saveClose); saveRoot.append(saveBox); document.body.append(saveRoot);
   css.textContent += '#local-save-files[hidden],#local-title-saves[hidden]{display:none!important}#local-save-files{position:fixed;inset:0;z-index:999;background:#142219;color:white;overflow:auto;padding:max(24px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));box-sizing:border-box;font:17px/1.5 system-ui,sans-serif}#local-save-files>div{max-width:650px;margin:auto}#local-save-files button,#local-title-saves{font:inherit;min-height:48px;padding:10px 14px;background:#385a39;color:white;border:1px solid #9ab69a;border-radius:8px;margin:6px 0}#local-save-files input{font:inherit;max-width:100%}#local-save-files .save-file{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #3d5941}#local-save-files .save-file span{overflow-wrap:anywhere}#local-title-saves{position:fixed;bottom:max(12px,env(safe-area-inset-bottom));right:max(12px,env(safe-area-inset-right));z-index:50}';
   for (var type of ['pointerdown','pointerup','pointermove','mousedown','mouseup','click','touchstart','touchmove','touchend','wheel','keydown','keyup','keypress']) saveRoot.addEventListener(type, function (e) { e.stopPropagation(); });

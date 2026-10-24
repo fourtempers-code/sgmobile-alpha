@@ -43,7 +43,15 @@ Unshield's zlib1.3.2: licenses/zlib.txt; https://zlib.net/
 These notices were copied from the installed build toolchain/source.
 
 The SG Mobile icon was supplied by the project maintainer.
-No optional video converter or webm-muxer is shipped in this candidate.
+Original movie playback: minimal unmodified FFmpeg7.1.1 Bink demuxer/decoders,
+LGPL2.1-or-later; licenses/lgpl-2.1.txt and licenses/ffmpeg.txt.
+No GPL/nonfree codec configuration, network support or encoders are enabled.
+Corresponding source and the exact adapter/build recipe accompany the app:
+  sources/ffmpeg-7.1.1.tar.xz
+  sources/bink-adapter.c
+  sources/build-bink.py
+No original movie bytes or webm-muxer are distributed.
+Upstream: https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz
 
 Discord/Clyde symbol: trademark of Discord Inc., used to identify a community
 invitation. Unmodified white symbol from https://discord.com/branding;

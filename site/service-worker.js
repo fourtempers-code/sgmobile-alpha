@@ -1,5 +1,5 @@
 // Versioned app resources only. Original files/saves stay in OPFS/IndexedDB.
-const BUILD = 'alpha100-setup-guide-v3-20261022T143751Z';
+const BUILD = 'alpha110-release-v1-20261024T014532Z';
 const CACHE = 'simgolf-app-' + BUILD;
 const BASE = new URL('./', self.location.href);
 const manifestURL = new URL('release.json', BASE).href;

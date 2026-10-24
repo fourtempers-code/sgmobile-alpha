@@ -6,6 +6,7 @@
   var leaderboardOpen=false,wasTournament=false,leaderboardStamp='';
   var courseBadgeStamp='';
   var activeImprovement=-1,buildingChoices=false,panBuildTool=null,lastBuildTool=null;
+  var contextGroup='',pendingSection=null,pendingModalKey='',sectionChoicesOpen=false,selectedSection='';
   var landmarkBenefits=['Boosts nearby golfers’ happiness.','Prevents dandelions nearby.','Helps your golfer improve skills nearby.','Encourages happy outcomes in nearby golfer stories.'];
   function landmarkName(l){var n=l?.name.trim();return n?n.charAt(0).toUpperCase()+n.slice(1):'Landmark';}
   function landmarkPrice(l){return l.free?'Free · donated landmark':'$'+l.price.toLocaleString();}
@@ -14,28 +15,37 @@
   var buildingBenefits=['Helps imaginative golfers.','Feeds hungry golfers.','Improves accurate golfers.','Encourages golfers to become members.','Helps long hitters.','Helps golfers play faster.','Increases property values.','Helps golfers stay happier.','Supports higher greens fees.'];
   var improvements=[['Ballwasher',0,3],['Pathway',1,0],['Building lot',2,5],['Bench',3,1],['Landmark',4,4],['Flower bed',5,2],['Scenic tree',6,16],['Scenic bridge',9,19]];
   var root=document.createElement('div');root.id='mobile-ui';
+  var rail=document.createElement('nav');rail.id='mobile-mode-rail';rail.hidden=true;rail.setAttribute('aria-label','Game sections');
   var style=document.createElement('style');style.textContent=`
     #mobile-ui{position:fixed;inset:22px 0 0;z-index:30;pointer-events:none;color:#fff;font:15px system-ui,sans-serif}
     #sv-btn{display:none!important}
     #mobile-ui [hidden]{display:none!important}
-    #mobile-ui button,#mobile-ui input{font:inherit;min-height:44px;box-sizing:border-box}
-    #mobile-ui button{padding:9px 12px;border:1px solid #aaa;border-radius:5px;background:#243229;color:#fff;cursor:pointer;touch-action:manipulation;pointer-events:auto}
-    #mobile-ui button[aria-pressed=true]{background:#496d42;border-color:#eee}
-    #mobile-ui .icon{width:48px;height:48px;padding:10px}#mobile-ui .icon svg{width:26px;height:26px;display:block;pointer-events:none}
+    #mobile-ui button,#mobile-ui input,#mobile-mode-rail button,#mobile-cancel{font:inherit;min-height:44px;box-sizing:border-box}
+    #mobile-ui button,#mobile-mode-rail button,#mobile-cancel{padding:9px 12px;border:1px solid #aaa;border-radius:5px;background:#243229;color:#fff;cursor:pointer;touch-action:manipulation;pointer-events:auto}
+    #mobile-ui button[aria-pressed=true],#mobile-mode-rail button[aria-pressed=true]{background:#496d42;border-color:#eee}
+    #mobile-ui .icon,#mobile-cancel{width:48px;height:48px;padding:10px}#mobile-ui .icon svg,#mobile-cancel svg{width:26px;height:26px;display:block;pointer-events:none}
     #mobile-build-actions{position:absolute;right:calc(max(8px,env(safe-area-inset-right)) + 168px);bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px));display:flex;gap:6px}
-    #mobile-cancel{position:absolute;left:max(8px,env(safe-area-inset-left));bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px))}
+    #mobile-cancel{position:fixed;z-index:90;left:max(8px,env(safe-area-inset-left));bottom:calc(var(--mobile-bottom-offset,0px) + max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px))}#mobile-cancel[hidden]{display:none!important}
     #mobile-build-strip{position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));padding:6px;background:#142219f2;border:1px solid #879b86;border-radius:6px;pointer-events:auto;box-sizing:border-box}
     #mobile-build-strip .strip-title{font-size:13px;margin:0 0 4px}#mobile-build-strip .strip-items{display:flex;gap:6px;overflow-x:auto;overscroll-behavior:contain;touch-action:pan-x;padding-bottom:3px}
     #mobile-build-strip button{flex:0 0 88px;min-height:72px;padding:5px;font-size:12px;touch-action:pan-x}
     #mobile-build-strip canvas{width:64px;height:42px;object-fit:contain;display:block;margin:auto;image-rendering:pixelated;pointer-events:none}
     #mobile-build-strip span{display:block}#mobile-build-strip .variations{margin-top:6px}#mobile-build-strip .variations button{min-height:44px;flex-basis:108px}#mobile-build-strip .landmark-choice{flex-basis:auto;min-height:44px;white-space:nowrap}#mobile-build-strip svg{width:36px;height:42px;display:block;margin:auto;pointer-events:none}
-    #mobile-panel.landmarks{left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));top:max(8px,env(safe-area-inset-top));bottom:max(8px,env(safe-area-inset-bottom));width:auto;max-height:none!important;z-index:2;background:#142219}
-    #mobile-ui.landmarks-open > :not(#mobile-panel){visibility:hidden}#mobile-panel.landmarks > button:first-child{position:sticky;top:0;z-index:1}
+    #mobile-panel.landmarks{left:max(8px,env(safe-area-inset-left));right:var(--mobile-rail-space);top:max(8px,env(safe-area-inset-top));bottom:max(8px,env(safe-area-inset-bottom));width:auto;max-height:none!important;z-index:2;background:#142219}
+    #mobile-ui.landmarks-open > :not(#mobile-panel){visibility:hidden}#mobile-panel.landmarks{padding-bottom:64px}
     #mobile-panel.landmarks .items{grid-template-columns:1fr;align-items:stretch}#mobile-panel.landmarks .landmark-card{display:flex;flex-direction:row;align-items:center;gap:12px;text-align:left;min-height:112px}#mobile-panel.landmarks .landmark-card strong{font-size:17px}#mobile-panel.landmarks .landmark-card span{font-size:14px;line-height:1.35}#mobile-panel.landmarks .landmark-card:disabled{opacity:.7}#mobile-panel.landmarks .landmark-status{font-weight:bold}
     #mobile-panel.landmarks .landmark-card canvas{width:88px;height:88px;object-fit:contain;flex:none;image-rendering:pixelated}#mobile-panel.landmarks .card-details{display:flex;flex-direction:column;gap:5px;min-width:0}
     #mobile-ui button:disabled{opacity:.45;cursor:default}
-    #mobile-menu{position:absolute;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right))}
-    #mobile-panel{position:absolute;left:max(8px,env(safe-area-inset-left));top:calc(max(8px,env(safe-area-inset-top)) + 50px);width:min(330px,calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 16px));max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 94px);overflow:auto;background:#142219f2;border:1px solid #aaa;border-radius:6px;padding:8px;box-sizing:border-box;pointer-events:auto;overscroll-behavior:contain}
+    :root{--mobile-surface:rgba(20,34,25,.7794);--mobile-rail-space:calc(max(8px,env(safe-area-inset-right)) + 60px)}
+    #mobile-mode-rail[hidden],#mobile-mode-rail button[hidden]{display:none!important}
+    #mobile-mode-rail{position:fixed;right:max(8px,env(safe-area-inset-right));top:calc(22px + max(8px,env(safe-area-inset-top)));z-index:90;display:flex;flex-direction:column;gap:6px;pointer-events:none;overflow-y:auto;overscroll-behavior:contain;font:15px system-ui,sans-serif}
+    #mobile-mode-rail button.icon{width:48px;height:48px;min-height:48px;flex:none;padding:10px;border-radius:5px}
+    #mobile-mode-rail svg{display:block;width:26px;height:26px;pointer-events:none}
+    #mobile-mode-rail button[aria-pressed=true]{box-shadow:inset 3px 0 #d9efaa}
+    body.mobile-rail-visible #mobile-profile,body.mobile-rail-visible #mobile-staff,body.mobile-rail-visible #mobile-match,body.mobile-rail-visible #mobile-load,body.mobile-rail-visible #local-save-files{padding-right:var(--mobile-rail-space)}
+    body.mobile-rail-visible #local-save-files{z-index:75}
+    body.mobile-rail-visible #mobile-profile-return,body.mobile-rail-visible #mobile-staff-return,body.mobile-rail-visible #mobile-load-return{right:var(--mobile-rail-space)}
+    #mobile-panel{position:absolute;left:max(8px,env(safe-area-inset-left));top:calc(max(8px,env(safe-area-inset-top)) + 50px);width:min(330px,calc(100% - max(8px,env(safe-area-inset-left)) - var(--mobile-rail-space) - 8px));max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 94px);overflow:auto;background:#142219f2;border:1px solid #aaa;border-radius:6px;padding:8px;box-sizing:border-box;pointer-events:auto;overscroll-behavior:contain}
     #mobile-panel h2{font-size:17px;margin:8px 0}#mobile-panel p{margin:8px 0;font-size:13px}
     #mobile-panel .items{display:grid;grid-template-columns:1fr 1fr;gap:6px}#mobile-panel .wide{grid-column:1/-1}
     #mobile-dialog-actions{position:absolute;right:max(8px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));display:flex;gap:6px}
@@ -43,11 +53,15 @@
     #mobile-round-controls{position:absolute;left:max(8px,env(safe-area-inset-left));right:80px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 54px);display:flex;gap:6px;flex-wrap:wrap}
     #mobile-shot-choices{position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 162px);display:flex;gap:6px;overflow:auto;padding:4px;background:#142219ed;border-radius:6px;pointer-events:auto;overscroll-behavior:contain}
     #mobile-shot-choices button{flex:0 0 auto}#mobile-shot-choices button[aria-pressed=true]{background:#496d42;border-color:#eee}
+    #mobile-terrain-controls{position:absolute;left:16px;right:16px;max-width:420px;margin:0 auto;bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 64px);display:grid;grid-template-columns:48px minmax(96px,120px) 48px;justify-content:space-between;align-items:center;row-gap:8px;pointer-events:none}
+    #mobile-terrain-up{grid-column:1}#mobile-terrain-precision{grid-column:2;min-width:96px}#mobile-terrain-down{grid-column:3}
+    #mobile-terrain-controls button{background:var(--mobile-surface)}#mobile-terrain-controls button[aria-pressed=true]{background:rgba(73,109,66,.7794)}
+    #mobile-terrain-status{grid-column:1/-1;grid-row:1;justify-self:center;text-align:center;font-size:12px;max-width:100%;padding:4px 8px;border-radius:5px;background:var(--mobile-surface);pointer-events:none}
     #mobile-lot-controls{position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 58px);display:flex;gap:10px;align-items:center;padding:8px;background:#142219f2;border-radius:6px;pointer-events:auto}#mobile-lot-controls div{flex:1;font-size:13px;line-height:1.4;text-align:center}#mobile-place-lot{flex:none;min-width:70px}
     #mobile-round-info{position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 220px);max-height:24vh;overflow:auto;padding:6px;background:#142219ed;border-radius:6px;font-size:13px;text-align:center;pointer-events:auto}
     @media(min-width:720px){#mobile-round-controls{left:calc(max(8px,env(safe-area-inset-left)) + 54px);bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 54px);right:180px}#mobile-shot-choices{bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 108px)}#mobile-round-info{bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 166px)}}
     #mobile-course-badge{position:absolute;left:max(8px,env(safe-area-inset-left));top:max(8px,env(safe-area-inset-top));display:flex;align-items:center;gap:0;padding:5px 8px 5px 0;box-sizing:border-box;width:calc(100% - max(8px,env(safe-area-inset-left)) - max(8px,env(safe-area-inset-right)) - 64px);max-width:620px;min-height:78px;pointer-events:none;isolation:isolate}
-    #mobile-course-badge:before{content:"";position:absolute;inset:0 0 0 28px;background:rgba(20,34,25,.7794);border-radius:6px;z-index:-1}
+    #mobile-course-badge:before{content:"";position:absolute;inset:0 0 0 28px;background:var(--mobile-surface);border-radius:6px;z-index:-1}
     #mobile-course-badge canvas{width:72px;height:72px;object-fit:contain;flex:none;margin-right:4px;image-rendering:pixelated}
     #mobile-course-details{min-width:0;flex:1;display:grid;grid-template-columns:minmax(0,1fr) max-content;grid-template-rows:26px 20px 20px;column-gap:8px;align-items:center}
     #mobile-course-heading{grid-area:1/1;display:flex;align-items:baseline;gap:5px;min-width:0;white-space:nowrap}
@@ -65,23 +79,30 @@
     @media(max-width:500px){#mobile-course-badge{max-width:none}#mobile-course-badge canvas{width:64px;height:72px}#mobile-course-details{column-gap:5px}#mobile-course-name,#mobile-course-stats #mobile-course-money{font-size:16px}#mobile-course-meta{font-size:10px}#mobile-course-indicators{gap:3px;font-size:10px}#mobile-course-indicators .course-counter svg{width:12px;height:12px}}
     @media(max-width:360px){#mobile-course-details{column-gap:3px}#mobile-course-heading{gap:3px}#mobile-course-indicators{gap:2px;font-size:9px}#mobile-course-indicators .course-counter{gap:1px}#mobile-course-indicators .course-counter svg{width:10px;height:10px}#mobile-course-stats span{font-size:10px}}
     #mobile-leaderboard-toggle{position:absolute;left:max(8px,env(safe-area-inset-left));top:calc(max(8px,env(safe-area-inset-top)) + var(--course-badge-space,0px));max-width:calc(100% - max(8px,env(safe-area-inset-left)) - max(8px,env(safe-area-inset-right)) - 64px)}
-    #mobile-leaderboard{position:absolute;left:max(8px,env(safe-area-inset-left));top:calc(max(8px,env(safe-area-inset-top)) + var(--course-badge-space,0px) + 52px);width:min(330px,calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right) - 16px));max-height:min(55dvh,calc(100% - max(8px,env(safe-area-inset-top)) - var(--course-badge-space,0px) - max(8px,env(safe-area-inset-bottom)) - 120px));overflow:auto;overscroll-behavior:contain;touch-action:pan-y;box-sizing:border-box;background:#142219f2;border:1px solid #879b86;border-radius:6px;padding:10px;pointer-events:auto}
+    #mobile-leaderboard{position:absolute;left:max(8px,env(safe-area-inset-left));top:calc(max(8px,env(safe-area-inset-top)) + var(--course-badge-space,0px) + 52px);width:min(330px,calc(100% - max(8px,env(safe-area-inset-left)) - var(--mobile-rail-space) - 8px));max-height:min(55dvh,calc(100% - max(8px,env(safe-area-inset-top)) - var(--course-badge-space,0px) - max(8px,env(safe-area-inset-bottom)) - 120px));overflow:auto;overscroll-behavior:contain;touch-action:pan-y;box-sizing:border-box;background:#142219f2;border:1px solid #879b86;border-radius:6px;padding:10px;pointer-events:auto}
     #mobile-leaderboard h2{font-size:16px;margin:0 0 6px}#mobile-leaderboard p{font-size:13px;margin:3px 0;overflow-wrap:anywhere}#mobile-leaderboard ol{list-style:none;margin:8px 0 0;padding:0}#mobile-leaderboard li{padding:6px 0;border-top:1px solid #556b58;font-size:14px;overflow-wrap:anywhere}
     #mobile-camera{position:absolute;right:max(8px,env(safe-area-inset-right));bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px));display:flex;gap:6px}
     #mobile-round-toggles{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 54px);bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px));display:flex;gap:6px}#mobile-round-toggles button{padding:9px 8px}
     #mobile-scorecard{position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 220px);max-height:32vh;overflow:auto;background:#142219f2;padding:8px;border-radius:6px;pointer-events:auto;text-align:center}
     #mobile-scorecard table{border-collapse:collapse;width:100%;font-size:13px}#mobile-scorecard th,#mobile-scorecard td{padding:4px;border-bottom:1px solid #556b58}#mobile-scorecard caption{padding:4px}#mobile-scorecard tr.current{background:#365137}
     @media(min-width:720px){#mobile-scorecard{bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 166px)}}
-    #mobile-build{position:absolute;right:max(8px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 50px)}
     #mobile-close-photo{position:absolute;left:max(8px,env(safe-area-inset-left));top:max(8px,env(safe-area-inset-top))}
-    #mobile-open-hole{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 54px);bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px));width:48px;height:48px;font-weight:bold}
+    #mobile-open-hole{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 54px);bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px));width:48px;height:48px}
     #mobile-closeup{position:absolute;right:max(8px,env(safe-area-inset-right));bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 52px);background:#142219e8;border-radius:6px;padding:6px;pointer-events:none}
     #mobile-closeup output{min-width:40px;text-align:center}
-    #mobile-message{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 50px);left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));margin:0 auto;max-width:480px;max-height:24%;overflow:auto;white-space:pre-wrap;text-align:center;padding:8px;box-sizing:border-box;border-radius:5px;background:#142219ed;text-shadow:0 1px #000;pointer-events:auto}
+    #mobile-message{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 50px);left:max(8px,env(safe-area-inset-left));right:var(--mobile-rail-space);margin:0 auto;max-width:480px;max-height:24%;overflow:auto;white-space:pre-wrap;text-align:center;padding:8px;box-sizing:border-box;border-radius:5px;background:#142219ed;text-shadow:0 1px #000;pointer-events:auto}
+    #mobile-mode-rail button,#mobile-cancel,#mobile-ui > button,#mobile-camera button,#mobile-build-actions button,#mobile-round-controls button,#mobile-round-toggles button{background:var(--mobile-surface)}
+    #mobile-mode-rail button[aria-pressed=true],#mobile-ui > button[aria-pressed=true],#mobile-camera button[aria-pressed=true],#mobile-build-actions button[aria-pressed=true],#mobile-round-controls button[aria-pressed=true],#mobile-round-toggles button[aria-pressed=true]{background:rgba(73,109,66,.7794)}
+    body.mobile-rail-visible #mobile-profile,body.mobile-rail-visible #mobile-staff,body.mobile-rail-visible #mobile-match,body.mobile-rail-visible #mobile-load,body.mobile-rail-visible #local-save-files{padding-bottom:calc(max(8px,env(safe-area-inset-bottom)) + 60px)}
   `;document.head.appendChild(style);
-  var menu=icon('Menu','M3 6h18M3 12h18M3 18h18',function(){if(Module.aimMode)Module.setAimMode(false);Module.cancelMapGesture();if(building)endBuild();open=!open;page='';render();});menu.id='mobile-menu';root.appendChild(menu);
-  var buildShortcut=button('Build',function(){navigate('build');});buildShortcut.id='mobile-build';root.appendChild(buildShortcut);
-  var openHole=button('H',function(){pendingHole={hole:s.hole,count:s.openHoles,time:performance.now()};command(0,104);});openHole.id='mobile-open-hole';openHole.setAttribute('aria-label','Open hole');openHole.title='Open hole';root.appendChild(openHole);
+  var menu=icon('Menu','M3 6h18M3 12h18M3 18h18',function(){requestSection('system');});menu.id='mobile-menu';
+  var buildShortcut=artIcon("Build","<g transform=\"rotate(-40 32 32)\"><path d=\"M16 7h27v14H16z\"/><rect x=\"28\" y=\"20\" width=\"7\" height=\"38\" rx=\"2\"/></g><g transform=\"rotate(40 32 32)\"><path d=\"M24 5h16v8a8 8 0 0 1-16 0z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"5\"/><rect x=\"29\" y=\"20\" width=\"6\" height=\"26\"/><path d=\"M21 42h22v9a11 11 0 0 1-22 0z\"/></g>",function(){requestSection('build');});buildShortcut.id='mobile-build';
+  var playShortcut=artIcon("Play","<ellipse cx=\"32\" cy=\"51\" rx=\"24\" ry=\"7\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\"/><path d=\"M29 8v42\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"5\" stroke-linecap=\"round\"/><path d=\"M31 8l23 10-23 10z\"/><circle cx=\"15\" cy=\"43\" r=\"4\"/>",function(){requestSection('play');});playShortcut.id='mobile-play';
+  var manageShortcut=artIcon("Manage","<circle cx=\"32\" cy=\"17\" r=\"8\"/><circle cx=\"15\" cy=\"25\" r=\"6\"/><circle cx=\"49\" cy=\"25\" r=\"6\"/><path d=\"M19 55V43a13 13 0 0 1 26 0v12zM3 51V41a11 11 0 0 1 14-10l4 3a17 17 0 0 0-7 17zM50 51a17 17 0 0 0-7-17l4-3a11 11 0 0 1 14 10v10z\"/>",function(){requestSection('manage');});manageShortcut.id='mobile-manage';
+  var sectionButtons={system:menu,build:buildShortcut,play:playShortcut,manage:manageShortcut};
+  for(var name of Object.keys(sectionButtons)){sectionButtons[name].dataset.section=name;sectionButtons[name].setAttribute('aria-controls','mobile-panel');rail.appendChild(sectionButtons[name]);}
+  document.body.appendChild(rail);
+  var openHole=icon('Open hole','M4 3h4v7h8V3h4v18h-4v-7H8v7H4z',function(){pendingHole={hole:s.hole,count:s.openHoles,time:performance.now()};command(0,104);});openHole.querySelector('svg').setAttribute('fill','currentColor');openHole.querySelector('svg').setAttribute('stroke','none');openHole.id='mobile-open-hole';openHole.setAttribute('aria-label','Open hole');openHole.title='Open hole';root.appendChild(openHole);
   var closePhoto=button('Close photo',function(){Module.setAimMode(false);Module.keyboardInput(27,27);});closePhoto.id='mobile-close-photo';root.appendChild(closePhoto);
   var camera=document.createElement('div');camera.id='mobile-camera';
   var pan=icon('Pan map','M12 2v20M2 12h20M8 6l4-4 4 4M8 18l4 4 4-4M6 8l-4 4 4 4M18 8l4 4-4 4',function(){
@@ -99,9 +120,15 @@
   camera.append(pan,icon('Rotate left','M3 10a9 9 0 1 1 2 8M3 4v6h6',function(){command(1,36);}),icon('Rotate right','M21 10a9 9 0 1 0-2 8M21 4v6h-6',function(){command(1,33);}));root.appendChild(camera);
   var buildActions=document.createElement('div');buildActions.id='mobile-build-actions';
   var remove=icon('Remove / Undo','M4 14l9-11 8 7-9 11H7l-3-3zM7 21h15M9 8l8 7',function(){Module.setMapMode(Module.mapMode===2?0:2);syncControls();});remove.id='mobile-remove';
-  var cancel=icon('Cancel','M5 5l14 14M19 5L5 19',function(){endBuild();Module.keyboardInput(27,27);open=false;render();});cancel.id='mobile-cancel';buildActions.append(remove);root.append(buildActions,cancel);
+  var cancel=icon('Cancel','M5 5l14 14M19 5L5 19',cancelSection);cancel.id='mobile-cancel';cancel.hidden=true;buildActions.append(remove);root.append(buildActions);document.body.appendChild(cancel);
   var strip=document.createElement('section');strip.id='mobile-build-strip';strip.setAttribute('aria-label','Construction choices');root.appendChild(strip);
   var lotControls=document.createElement('section');lotControls.id='mobile-lot-controls';lotControls.hidden=true;lotControls.setAttribute('aria-label','Building lot placement');var lotDetails=document.createElement('div');lotDetails.setAttribute('role','status');var placeLot=button('Place',function(){Module.requestLot();syncControls();});placeLot.id='mobile-place-lot';lotControls.append(lotDetails,placeLot);root.appendChild(lotControls);
+  var terrainControls=document.createElement('section');terrainControls.id='mobile-terrain-controls';terrainControls.hidden=true;terrainControls.setAttribute('aria-label','Terrain adjustment');
+  var terrainStatus=document.createElement('div');terrainStatus.id='mobile-terrain-status';terrainStatus.setAttribute('role','status');
+  var terrainUp=icon('Raise selected terrain','M12 20V4M5 11l7-7 7 7',function(){Module.requestTerrainStep(1);});terrainUp.id='mobile-terrain-up';terrainUp.hidden=true;
+  var terrainPrecision=button('Precision',function(){Module.setTerrainMode(!Module.terrainMode);syncControls();});terrainPrecision.id='mobile-terrain-precision';terrainPrecision.setAttribute('aria-label','Precision terrain control');terrainPrecision.setAttribute('aria-pressed','false');
+  var terrainDown=icon('Lower selected terrain','M12 4v16M5 13l7 7 7-7',function(){Module.requestTerrainStep(-1);});terrainDown.id='mobile-terrain-down';terrainDown.hidden=true;
+  terrainControls.append(terrainStatus,terrainUp,terrainPrecision,terrainDown);root.appendChild(terrainControls);
   var roundControls=document.createElement('div');roundControls.id='mobile-round-controls';root.appendChild(roundControls);
   var shots=button('Shots',function(){if(s.staffRound){command(13,0,true);return;}shotChoicesOpen=!shotChoicesOpen;syncControls();});shots.id='mobile-shots';
   var aim=button('Aim',function(){Module.setAimMode(!Module.aimMode);syncControls();});aim.id='mobile-aim';
@@ -141,17 +168,75 @@
   dialog.append(button('Keyboard',function(){open=true;page='keyboard';render();}),button('Enter',function(){Module.keyboardInput(13,13);}),button('Back',function(){Module.keyboardInput(27,27);}));root.appendChild(dialog);
   ['mousedown','mousemove','mouseup','click','pointerdown','pointerup','pointermove','touchstart','touchmove','touchend','wheel','keydown','keyup','keypress','beforeinput','input','compositionstart','compositionupdate','compositionend'].forEach(function(t){root.addEventListener(t,function(e){e.stopPropagation();});});
   document.body.appendChild(root);
+  for(var type of ['mousedown','mousemove','mouseup','click','dblclick','pointerdown','pointerup','pointermove','touchstart','touchmove','touchend','wheel','keydown','keyup','keypress'])for(var control of [rail,cancel])control.addEventListener(type,function(e){e.stopPropagation();});
   // Keep the pressed button alive while original status/rosters update. A
   // rebuilt panel between touch-down and release would lose the click.
   var menuPointers=new Set();
-  root.addEventListener('pointerdown',function(e){menuPointers.add(e.pointerId);},true);
+  for(var region of [root,rail,cancel])region.addEventListener('pointerdown',function(e){menuPointers.add(e.pointerId);},true);
   ['pointerup','pointercancel'].forEach(function(type){addEventListener(type,function(e){menuPointers.delete(e.pointerId);},true);});
   addEventListener('blur',function(){menuPointers.clear();});
 
   function button(text,action){var b=document.createElement('button');b.type='button';b.textContent=text;b.addEventListener('click',action);return b;}
   function icon(label,path,action){var b=button('',action);b.className='icon';b.setAttribute('aria-label',label);b.title=label;var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','2');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');var p=document.createElementNS(svg.namespaceURI,'path');p.setAttribute('d',path);svg.appendChild(p);b.appendChild(svg);return b;}
+  // These SVG strings are app-authored constants, never imported game/user data.
+  function artIcon(label,art,action){var b=icon(label,'',action),svg=b.querySelector('svg');svg.setAttribute('viewBox','0 0 64 64');svg.setAttribute('fill','currentColor');svg.setAttribute('stroke','none');svg.setAttribute('stroke-linecap','butt');svg.setAttribute('stroke-linejoin','miter');svg.innerHTML=art;return b;}
   function endBuild(){panBuildTool=null;lastBuildTool=null;building=false;buildPage='';pendingHole=null;Module.setMapMode(0);}
-  function navigate(name){if(['build','course','terrain','buildings','improvements'].includes(name)){building=true;buildPage=name;stripStamp='';if(name==='improvements'){activeImprovement=-1;buildingChoices=false;}}else if(building)endBuild();page=name;open=true;if(name==='course'||name==='improvements')open=false;render();}
+  function navigate(name){if(Module.terrainMode)Module.setTerrainMode(false);contextGroup=groupForPage(name);if(['build','course','terrain','buildings','improvements'].includes(name)){building=true;buildPage=name;stripStamp='';if(name==='improvements'){activeImprovement=-1;buildingChoices=false;}}else if(building)endBuild();page=name;open=true;if(name==='course'||name==='improvements')open=false;render();}
+  function groupForPage(name){
+    if(['build','course','terrain','improvements','buildings','landmarks'].includes(name))return 'build';
+    if(['play','shots','golfers'].includes(name))return 'play';
+    if(['manage','staff'].includes(name))return 'manage';
+    return name==='system'||name==='keyboard'?'system':'';
+  }
+  function modalSection(){
+    for(var entry of [['local-save-files','system','local-save-close'],['mobile-profile',Module.loadDeleteConfirm?'system':'play','mobile-profile-done'],['mobile-staff','manage','mobile-staff-done'],['mobile-load','system','mobile-load-cancel'],['mobile-match','play','mobile-match-back']]){
+      var element=document.getElementById(entry[0]);
+      if(element&&!element.hidden&&element.getClientRects().length)return {id:entry[0],group:entry[1],close:document.getElementById(entry[2]),key:entry[0]+':'+(entry[0]==='mobile-profile'?Module.profileState?.kind:entry[0]==='mobile-staff'?(Module.staffHire?'hire':Module.staffRenaming>=0?'rename':'roster'):'screen')};
+    }
+    return null;
+  }
+  function dismissSectionDialog(modal){
+    var close=modal.close;
+    if(close&&!close.disabled&&close.getClientRects().length){close.click();return true;}
+    if(modal.id==='mobile-profile'&&Module.profileState?.kind>=4){leaveKeyboard();Module.keyboardInput(27,27);return true;}
+    return false;
+  }
+  function closeSection(){sectionChoicesOpen=false;selectedSection='';if(page==='keyboard')leaveKeyboard();if(building)endBuild();open=false;page='';contextGroup='';render();}
+  function showSection(name){
+    if(!name){closeSection();return;}
+    sectionChoicesOpen=name==='system';selectedSection=sectionChoicesOpen?'':name;
+    navigate(name);
+  }
+  function requestSection(name){
+    if(Module.terrainMode)Module.setTerrainMode(false);if(Module.aimMode)Module.setAimMode(false);Module.cancelMapGesture();
+    var modal=modalSection();
+    if(modal||(!s.course&&seenCourse)){
+      pendingSection=name;
+      // Use each screen's ordinary Back/Done action; never bypass its native
+      // confirmation or abandon edits by forcing game state.
+      if(modal){pendingModalKey=modal.key;dismissSectionDialog(modal);}
+      else {leaveKeyboard();Module.keyboardInput(27,27);}
+      return;
+    }
+    pendingSection=null;showSection(name);
+  }
+  function cancelSection(){
+    if(Module.terrainMode)Module.setTerrainMode(false);if(Module.aimMode)Module.setAimMode(false);Module.cancelMapGesture();
+    if(modalSection()||(!s.course&&seenCourse)){requestSection('');return;}
+    pendingSection=null;
+    // Closing a web panel must not also cancel an unrelated native selection.
+    if(open||sectionChoicesOpen||selectedSection){closeSection();return;}
+    closeSection();Module.keyboardInput(27,27);
+  }
+  function syncRail(){
+    rail.hidden=!seenCourse;document.body.classList.toggle('mobile-rail-visible',!rail.hidden);
+    var modal=modalSection(),active=modal?modal.group:open?groupForPage(page):building?'build':selectedSection||(!s.course?contextGroup:'');
+    for(var name of Object.keys(sectionButtons)){
+      var button=sectionButtons[name];button.hidden=name!=='system'&&!sectionChoicesOpen&&name!==selectedSection;
+      button.setAttribute('aria-pressed',String(!rail.hidden&&!button.hidden&&active===name));
+      button.setAttribute('aria-expanded',String(name==='system'?sectionChoicesOpen:open&&groupForPage(page)===name));
+    }
+  }
   // Read the actual loaded indexed artwork/palette. No original art is bundled
   // in this UI or exported to a public package. Unsupported layouts retain text.
   function tileArt(t){
@@ -271,7 +356,7 @@
     row.scrollLeft=scroll;
   }
   function command(kind,item,keep){
-    Module.cancelMapGesture();
+    if(Module.terrainMode)Module.setTerrainMode(false);Module.cancelMapGesture();
     if(building&&[2,3,4,7].includes(kind)){lastBuildTool={kind:kind,item:item};}
     if(building&&kind===14&&lastBuildTool)lastBuildTool.variation=item;
     // Original construction requires native full detail. Reach that through
@@ -288,16 +373,16 @@
   function action(text,kind,item,enabled,keep){add(text,function(){command(kind,item,keep);},s.course&&enabled!==false);}
   var items;
   function render(){
-    if(Module.atTitle){wasTournament=false;leaderboardOpen=false;leaderboardStamp='';seenCourse=false;open=false;page='';building=false;buildPage='';panBuildTool=null;lastBuildTool=null;pendingHole=null;shotChoicesOpen=false;lastReady=false;wasRound=false;}
+    if(Module.atTitle){sectionChoicesOpen=false;selectedSection='';contextGroup='';pendingSection=null;wasTournament=false;leaderboardOpen=false;leaderboardStamp='';seenCourse=false;open=false;page='';building=false;buildPage='';panBuildTool=null;lastBuildTool=null;pendingHole=null;shotChoicesOpen=false;lastReady=false;wasRound=false;}
     else seenCourse=seenCourse||!!s.wasCourse;
     root.hidden=!seenCourse;root.classList.toggle('landmarks-open',open&&['landmarks','buildings'].includes(page));panel.classList.toggle('landmarks',open&&['landmarks','buildings'].includes(page));panel.hidden=!open;dialog.hidden=!seenCourse||s.course;
     syncControls();message.hidden=!s.message||open||!Module.mobileUI;
-    menu.setAttribute('aria-expanded',String(open));if(!open)return;
+    if(!open)return;
     panel.replaceChildren();
-    panel.appendChild(button(['landmarks','buildings'].includes(page)?'Back to map':page?'Back to menu':'Close',function(){if(['landmarks','buildings'].includes(page)){open=false;page='';render();return;}if(page){if(building)endBuild();page='';render();}else{open=false;render();}}));
+    var parentPage={terrain:'build',shots:'play',golfers:'play',keyboard:'system'}[page];
+    if(parentPage)panel.appendChild(button('Back to '+parentPage.charAt(0).toUpperCase()+parentPage.slice(1),function(){if(page==='keyboard')leaveKeyboard();navigate(parentPage);}));
     var title=document.createElement('h2');title.textContent=page?({build:'Build',course:'Course',terrain:'Terrain',buildings:'Buildings',improvements:'Improvements',landmarks:'Landmarks',play:'Play',shots:'Shot types',manage:'Manage',system:'System',staff:'Employees',golfers:'Golfers',keyboard:'Keyboard'}[page]||page):'Menu';panel.appendChild(title);
     items=document.createElement('div');items.className='items';panel.appendChild(items);
-    if(!page){['Build','Play','Manage','System'].forEach(function(name,i){add(name,function(){navigate(['build','play','manage','system'][i]);},true,true);});return;}
     if(['landmarks','buildings'].includes(page)){
       var isLandmark=page==='landmarks',note=document.createElement('p');note.textContent=isLandmark?'Choose a landmark, drag its preview to compare locations, then Place. The circle shows its influence. Locked landmarks require an original-game unlock.':'Choose a building, move its preview, then Place. Prices exclude site clearing; the location quote shows the total. Original unlock and upgrade requirements still apply.';panel.insertBefore(note,items);
       (isLandmark?s.landmarks:s.buildingDetails||[]).forEach(function(l){
@@ -345,7 +430,17 @@
   }
   function syncControls(){
     var course=!!s.course&&!!Module.mobileUI;
+    syncRail();
     syncCourseBadge(course);
+    var terrainAvailable=course&&building&&buildPage==='terrain'&&!open&&!panBuildTool&&!s.photoActive&&s.elevation&&s.terrainShape>=0&&s.terrainShape<3&&Module.mapMode!==2;
+    if(Module.terrainMode&&!terrainAvailable)Module.setTerrainMode(false);
+    terrainControls.hidden=!terrainAvailable;terrainUp.hidden=terrainDown.hidden=!Module.terrainMode;terrainPrecision.setAttribute('aria-pressed',String(!!Module.terrainMode));
+    if(terrainAvailable){
+      Module.refreshTerrainTarget();var preview=Module.terrainPreview,ready=!!Module.terrainMode&&preview?.serial===Module.terrainSerial&&preview.valid;
+      terrainUp.disabled=terrainDown.disabled=!ready||preview.pending>=32;
+      terrainStatus.textContent=['Vertex','Square','Area'][s.terrainShape]+' · '+(!Module.terrainMode?'Tap the map to raise':!ready?'Drag to choose a spot':'Drag to select · arrows adjust');
+    }
+    Module.refreshTerrainReticle();
     var previewLot=course&&building&&!open&&!panBuildTool&&!s.photoActive&&((s.object===5&&s.availableLots>0)||(s.object===4&&s.variation?.selected>=0&&(s.variation.mask&(1<<s.variation.selected)))||([1,2,16,19].includes(s.object)&&s.variation?.selected>=0)||(s.object>=6&&s.object<=14))&&Module.mapMode!==2;
     if(previewLot&&!Module.lotMode&&Module.lotCanStart())Module.setLotMode(true);
     else if(!previewLot&&Module.lotMode)Module.setLotMode(false);
@@ -353,7 +448,7 @@
     lotControls.hidden=!previewLot||!Module.lotMode;
     if(!lotControls.hidden){Module.refreshLotTarget();var p=Module.lotPreview,ready=p&&p.serial===Module.lotSerial;placeLot.disabled=!ready||!p.valid||!!Module.lotPending;var money=v=>'$'+v.toLocaleString();lotDetails.textContent=Module.lotPending?'Placing…':!ready?'Drag to preview a location; Place confirms.':p.kind===4?landmarkName(s.landmarks?.[p.variant])+' · '+(p.free?'Free':money(p.price))+' · '+p.radius+' yd influence'+(p.reason?' · '+p.reason:''):p.kind!==5?((s.object>=6&&s.object<=14?s.buildings[s.object-6]:variantLabel(p.kind,p.variant))+' · '+money(p.price)+(p.reason?' · '+p.reason:'')):p.reason||('Lot value '+money(p.value)+' · Preparation '+money(p.preparation)+' · Profit '+money(p.profit));if(openingLot)Module.centreLotTarget();}
 
-    camera.hidden=!course;buildActions.hidden=!course||s.photoActive;cancel.hidden=buildActions.hidden;remove.hidden=!building;remove.setAttribute('aria-pressed',String(Module.mapMode===2));pan.setAttribute('aria-pressed',String(panBuildTool!==null||(Module.mapMode===0&&!s.constructing)));syncBuildStrip();root.style.setProperty('--strip-space',(strip.hidden?0:strip.getBoundingClientRect().height+8)+'px');closeup.hidden=!course;closeup.style.bottom=lotControls.hidden?'':'calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + '+(64+lotControls.getBoundingClientRect().height)+'px)';roundControls.hidden=!course||!s.roundActive;
+    camera.hidden=!course;buildActions.hidden=!course||s.photoActive;cancel.hidden=!seenCourse||!Module.mobileUI;remove.hidden=!building;remove.setAttribute('aria-pressed',String(Module.mapMode===2));pan.setAttribute('aria-pressed',String(panBuildTool!==null||(Module.mapMode===0&&!s.constructing)));syncBuildStrip();var stripSpace=(strip.hidden?0:strip.getBoundingClientRect().height+8)+'px';root.style.setProperty('--strip-space',stripSpace);cancel.style.setProperty('--strip-space',modalSection()?'0px':stripSpace);closeup.hidden=!course;closeup.style.bottom=terrainAvailable?'calc(max(8px,env(safe-area-inset-bottom)) + '+(76+terrainControls.getBoundingClientRect().height)+'px)':lotControls.hidden?'':'calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + '+(64+lotControls.getBoundingClientRect().height)+'px)';roundControls.hidden=!course||!s.roundActive;
     toggles.style.bottom='calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + '+(building?54:0)+'px)';
     roundControls.style.bottom='calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + '+(building?108:54)+'px)';
     shots.textContent=s.staffRound?'Resume shots':'Shots';shots.disabled=!s.shotTurn&&!s.staffRound;aim.disabled=!s.shotTurn||s.photoActive||!!Module.shotPending;shoot.disabled=!s.shotReady||!Module.aimMode||!Module.aimCanShoot()||!!Module.shotPending;
@@ -391,10 +486,11 @@
       var list=document.createElement('ol');board.rows.forEach(function(text){var li=document.createElement('li');li.textContent=text;list.appendChild(li);});leaderboard.appendChild(list);leaderboard.scrollTop=scroll;
     }
     Module.refreshAimReticle();
-    buildShortcut.hidden=!course||!building||open;
     openHole.hidden=!course||!building||s.photoActive||!s.canOpenHole;
     openHole.disabled=!!pendingHole;
-    message.style.top='calc(max(8px,env(safe-area-inset-top)) + '+Math.max(building&&!open?100:50,courseBadge.hidden?0:courseBadge.getBoundingClientRect().height+8)+'px)';
+    var badgeSpace=courseBadge.hidden?0:courseBadge.getBoundingClientRect().height+8;
+    if(!panel.classList.contains('landmarks')){panel.style.top='calc(max(8px,env(safe-area-inset-top)) + '+badgeSpace+'px)';panel.style.maxHeight='calc(100% - max(8px,env(safe-area-inset-top)) - '+badgeSpace+'px - max(8px,env(safe-area-inset-bottom)) - 8px)';}else{panel.style.top='';panel.style.maxHeight='';}
+    message.style.top='calc(max(8px,env(safe-area-inset-top)) + '+Math.max(50,badgeSpace)+'px)';
   }
   function leaveKeyboard(){
     if(root.contains(document.activeElement)&&document.activeElement.tagName==='INPUT')document.activeElement.blur();
@@ -406,12 +502,19 @@
     var v=window.visualViewport;
     var header=document.getElementById('build-header').getBoundingClientRect().height;root.style.top=((v?v.offsetTop:0)+header)+'px';root.style.left=(v?v.offsetLeft:0)+'px';
     root.style.right='auto';root.style.bottom='auto';root.style.width=(v?v.width:innerWidth)+'px';root.style.height=Math.max(0,(v?v.height:innerHeight)-header)+'px';
-    panel.style.maxHeight=Math.max(80,(v?v.height:innerHeight)-header-90)+'px';
+    rail.style.top='calc('+((v?v.offsetTop:0)+header)+'px + max(8px,env(safe-area-inset-top)))';
+    rail.style.right='calc('+Math.max(0,innerWidth-(v?v.offsetLeft+v.width:innerWidth))+'px + max(8px,env(safe-area-inset-right)))';
+    cancel.style.left='calc('+(v?v.offsetLeft:0)+'px + max(8px,env(safe-area-inset-left)))';
+    cancel.style.setProperty('--mobile-bottom-offset',Math.max(0,innerHeight-(v?v.offsetTop+v.height:innerHeight))+'px');
+    rail.style.maxHeight='calc('+Math.max(0,(v?v.height:innerHeight)-header)+'px - max(8px,env(safe-area-inset-top)) - max(8px,env(safe-area-inset-bottom)))';
   }
   if(window.visualViewport){visualViewport.addEventListener('resize',syncVisibleArea);visualViewport.addEventListener('scroll',syncVisibleArea);}
   addEventListener('simgolf-header-resize',syncVisibleArea);addEventListener('resize',syncVisibleArea);addEventListener('pageshow',syncVisibleArea);syncVisibleArea();
   setInterval(function(){
     s=Module.mobileState||{};
+    var waitingModal=pendingSection!==null?modalSection():null;
+    if(waitingModal&&waitingModal.key!==pendingModalKey&&dismissSectionDialog(waitingModal))pendingModalKey=waitingModal.key;
+    if(pendingSection!==null&&s.course&&!s.staffOpen&&!Module.staffHire&&!Module.profileState?.active&&!Module.loadState?.active&&!modalSection()&&!Module.menuQueue.length&&!Module.profileQueue?.length&&!Module.staffHireQueue?.length&&!Module.loadQueue?.length){var requested=pendingSection;pendingSection=null;showSection(requested);}
     Module.updateMapPresentation(!!s.course);
     if(s.course&&Module.mobileUI){
       if(s.photoActive&&(Module.aimMode||Module.shotPending))Module.setAimMode(false);
@@ -566,7 +669,7 @@
     #mobile-staff-return{position:fixed;right:max(8px,env(safe-area-inset-right));top:calc(var(--staff-header,22px) + 8px);z-index:66}
     @media(max-height:500px){#mobile-staff{gap:6px}#mobile-staff header h1{font-size:19px}#mobile-staff .staff-card{min-height:84px}#mobile-staff .staff-card canvas{height:64px}}
   `;document.head.appendChild(style);
-  var header=document.createElement('header'),title=text('h1','Employees'),done=button('Back to course',close);header.append(title,done);root.appendChild(header);
+  var header=document.createElement('header'),title=text('h1','Employees'),done=button('Back to course',close);done.id='mobile-staff-done';header.append(title,done);root.appendChild(header);
   var note=text('p','');note.className='staff-note';note.setAttribute('role','status');root.appendChild(note);
   var warning=text('p','');warning.className='staff-note';warning.setAttribute('role','alert');warning.hidden=true;root.appendChild(warning);
   var content=document.createElement('div');content.className='staff-content';root.appendChild(content);
@@ -659,7 +762,7 @@
   var heading=text('h1','Continue saved game'),note=text('p','Newest files first, using actual save/modified times. Older imports may show when copied.');note.className='note';
   var content=document.createElement('div');content.id='mobile-load-content';var list=document.createElement('div');list.id='mobile-load-list';list.setAttribute('aria-label','Saved games, newest first');var preview=document.createElement('section');preview.id='mobile-load-preview';preview.setAttribute('aria-label','Selected course preview');content.append(list,preview);
   var status=text('div','');status.id='mobile-load-status';status.setAttribute('role','status');
-  var footer=document.createElement('footer'),load=button('Load selected game',()=>send(1,state.selected)),cancel=button('Cancel',()=>send(2,0)),original=button('Original load screen',()=>send(3,0)),remove=button('Delete selected save',()=>send(4,state.selected));remove.id='mobile-load-delete';footer.append(load,remove,cancel,original);root.append(heading,note,content,status,footer);
+  var footer=document.createElement('footer'),load=button('Load selected game',()=>send(1,state.selected)),cancel=button('Cancel',()=>send(2,0)),original=button('Original load screen',()=>send(3,0)),remove=button('Delete selected save',()=>send(4,state.selected));remove.id='mobile-load-delete';cancel.id='mobile-load-cancel';footer.append(load,remove,cancel,original);root.append(heading,note,content,status,footer);
   var back=button('Mobile saved games',()=>send(3,0));back.id='mobile-load-return';back.hidden=true;document.body.append(root,back);
   var state={},serial=0,stamp='',previewStamp='',pending=null,autoSelected=false,pointers=new Set();
   function send(op,index){if(!state.active)return;Module.cancelMapGesture();pending={op:op,index:index};(Module.loadQueue||(Module.loadQueue=[])).push([state.serial,op,index,state.rows?.find(r=>r.index===index)?.name]);refresh();}
@@ -722,7 +825,7 @@
     if(!m?.available||m.offer!==offered){offered=m?.offer??-1;stamp='';refresh();status.textContent='The available match changed. Review the current players before starting.';return;}
     if(Module.menuQueue.length>=16)return;
     Module.cancelMapGesture();Module.menuQueue.push([5,2]);shown=false;refresh();
-  });start.id='mobile-match-start';var proceed=button('Continue to match',()=>{if(Module.proIntro)Module.keyboardInput(13,13);});proceed.id='mobile-match-continue';footer.append(back,start,proceed);root.append(heading,content,status,footer);document.body.append(root);
+  });start.id='mobile-match-start';back.id='mobile-match-back';var proceed=button('Continue to match',()=>{if(Module.proIntro)Module.keyboardInput(13,13);});proceed.id='mobile-match-continue';footer.append(back,start,proceed);root.append(heading,content,status,footer);document.body.append(root);
   for(const type of ['pointerdown','pointerup','pointermove','pointercancel','mousedown','mouseup','mousemove','click','touchstart','touchmove','touchend','wheel','keydown','keyup','keypress'])root.addEventListener(type,e=>e.stopPropagation());
   root.addEventListener('pointerdown',e=>pressed.add(e.pointerId),true);for(const type of ['pointerup','pointercancel'])addEventListener(type,e=>pressed.delete(e.pointerId),true);addEventListener('blur',()=>pressed.clear());
   function player(profile,id,label,values){
