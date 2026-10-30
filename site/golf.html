@@ -14,9 +14,9 @@
   html, body { margin: 0; height: 100%; background: #111; }
   body { overflow: hidden; }
   #build-header {
-    position:fixed;z-index:100;top:env(safe-area-inset-top,0px);
-    left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);
-    box-sizing:border-box;padding:2px 6px;background:#142219ed;color:#fff;
+    position:fixed;z-index:100;top:calc(var(--screen-top,0px) + env(safe-area-inset-top,0px));
+    left:var(--screen-left,0px);right:auto;width:var(--screen-width,100%);
+    box-sizing:border-box;padding:2px calc(env(safe-area-inset-right,0px) + 6px) 2px calc(env(safe-area-inset-left,0px) + 6px);background:#142219ed;color:#fff;
     display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 12px;
     font:11px/18px system-ui,sans-serif;pointer-events:none;
   }
@@ -24,21 +24,108 @@
   #mobile-status{font-size:12px;text-align:left}
 
   #game-stage {
-    width: 100%; height: 100vh; height: 100dvh; box-sizing: border-box;
+    position:fixed;left:var(--screen-left,0px);top:var(--screen-top,0px);
+    width:var(--screen-width,100%);height:100vh;height:var(--screen-height,100dvh);box-sizing:border-box;
     padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
              env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
     display: flex; align-items: center; justify-content: center; overflow: hidden;
   }
+  /* World pixels cover the whole visible viewport. Controls and original
+     menus retain their own safe areas; do not subtract those from pan coverage. */
+  #game-stage.world-view { padding: 0; }
+  #safe-area-probe {
+    position: fixed; width: 0; height: 0; visibility: hidden; pointer-events: none;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+             env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  }
   canvas { flex: none; display: block; image-rendering: pixelated; touch-action: none; }
+  #map-display[hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<div id="build-header"><div id="build-label" title="SimGolf Mobile Alpha version 1.1 · alpha110-release-v1-20261024T014532Z">Alpha version 1.1 · alpha110-release-v1-20261024T014532Z</div><div id="mobile-status" hidden></div></div>
+<div id="build-header"><div id="build-label" title="SimGolf Mobile Alpha version 1.2 · alpha120-release-v1-20261030T014221Z">Alpha version 1.2 · alpha120-release-v1-20261030T014221Z</div><div id="mobile-status" hidden></div></div>
+<div id="safe-area-probe" aria-hidden="true"></div>
 <div id="game-stage"><canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas></div>
 <script>
   var Module = { canvas: document.getElementById('canvas'), fsDebug: true, apiTrace: /apitrace/.test(location.search), noVideos: /novideos/.test(location.search) };
   Module.localFiles = true;
-  Module.buildInfo = Object.freeze({version: 'alpha1.1.0', id: 'alpha110-release-v1-20261024T014532Z'});
+  Module.buildInfo = Object.freeze({version: 'alpha1.2.0', id: 'alpha120-release-v1-20261030T014221Z'});
+  // Fixed-position CSS is anchored to the layout viewport. Other browser
+  // measurements can briefly retain a previous folded/orientation size.
+  Module.getLayoutViewport=function(){return {width:document.documentElement.clientWidth||innerWidth,height:document.documentElement.clientHeight||innerHeight};};
+  // Use live browser bounds, never a device/model-specific display size.
+  Module.getScreenBounds=function(){
+    var v=window.visualViewport,probe=document.getElementById('safe-area-probe'),css=getComputedStyle(probe),layout=Module.getLayoutViewport();
+    var w=layout.width,h=layout.height;
+    // At unit page scale, a visual viewport wider but shorter (or narrower
+    // but taller) than layout cannot be a smaller visible rectangle. Treat
+    // that crossed pair as stale during rotation. Genuine keyboard reductions
+    // and page zoom retain their smaller bounds and offsets.
+    var crossed=v&&v.width>0&&v.height>0&&Math.abs((v.scale||1)-1)<.01&&Math.abs(v.offsetLeft||0)<1&&Math.abs(v.offsetTop||0)<1&&((v.width>w+2&&v.height<h-2)||(v.width<w-2&&v.height>h+2));
+    if(crossed)v=null;
+    var left=v&&Number.isFinite(v.offsetLeft)&&v.offsetLeft>=0&&v.offsetLeft<w?v.offsetLeft:0;
+    var top=v&&Number.isFinite(v.offsetTop)&&v.offsetTop>=0&&v.offsetTop<h?v.offsetTop:0;
+    // A resumed viewport can briefly report the old larger display. Keep all
+    // consumers inside the current layout while those reports settle. Smaller
+    // visual viewports (keyboard/page zoom) remain smaller; do not infer them.
+    return {left:left,top:top,width:Math.min(w-left,v&&v.width>0?v.width:w),height:Math.min(h-top,v&&v.height>0?v.height:h),
+      safe:{left:parseFloat(css.paddingLeft)||0,right:parseFloat(css.paddingRight)||0,top:parseFloat(css.paddingTop)||0,bottom:parseFloat(css.paddingBottom)||0}};
+  };
+  (function(){
+    var pending=false,frame=0,fallback=0,last='',timers=[];Module.screenLayoutTrace=[];
+    function sync(reason){pending=false;cancelAnimationFrame(frame);clearTimeout(fallback);frame=0;fallback=0;if(document.hidden)return;
+      var b=Module.getScreenBounds(),v=window.visualViewport,layout=Module.getLayoutViewport(),style=document.documentElement.style;
+      var key=JSON.stringify([b,innerWidth,innerHeight,v&&v.scale]);if(key===last)return;last=key;
+      for(var name of ['left','top','width','height'])style.setProperty('--screen-'+name,b[name]+'px');
+      style.setProperty('--screen-right-gap',Math.max(0,layout.width-b.left-b.width)+'px');
+      style.setProperty('--screen-bottom-gap',Math.max(0,layout.height-b.top-b.height)+'px');
+      Module.screenBounds=b;
+      Module.screenLayoutTrace.push({time:Date.now(),reason:reason||'explicit',bounds:b,layout:[document.documentElement.clientWidth,document.documentElement.clientHeight],inner:[innerWidth,innerHeight],visual:v?{width:v.width,height:v.height,left:v.offsetLeft,top:v.offsetTop,scale:v.scale}:null});
+      if(Module.screenLayoutTrace.length>32)Module.screenLayoutTrace.shift();
+      dispatchEvent(new Event('simgolf-screen-resize'));Module.refreshCanvasPresentation?.();
+    }
+    function schedule(reason){if(!pending){pending=true;frame=requestAnimationFrame(function(){sync(reason);});fallback=setTimeout(function(){sync(reason+'-timer');},120);}}
+    function settle(event){timers.forEach(clearTimeout);timers=[];var reason=event?.type||'resume';schedule(reason);
+      for(var ms of [120,360,800,1600])timers.push(setTimeout(function(){schedule(reason+'-settle');},ms));
+    }
+    Module.refreshScreenBounds=function(){sync('explicit');};
+    for(var type of ['resize','orientationchange','pageshow','focus'])addEventListener(type,settle);
+    document.addEventListener('visibilitychange',function(event){if(!document.hidden)settle(event);});
+    if(window.visualViewport){visualViewport.addEventListener('resize',settle);visualViewport.addEventListener('scroll',settle);}
+    // Some display transitions emit their last event before new metrics arrive.
+    // This read-only comparison makes late changes recover without a reload;
+    // unchanged samples do not dispatch events or re-enter/resize the engine.
+    setInterval(function(){if(!document.hidden)sync('geometry-check');},500);
+    sync('initial');
+    Module.getScreenDiagnostics=function(){var elements={};
+      for(var id of ['build-header','game-stage','canvas','mobile-ui','mobile-mode-rail','mobile-menu','mobile-camera','mobile-cancel']){
+        var e=document.getElementById(id);if(e)elements[id]={rect:e.getBoundingClientRect().toJSON(),hidden:e.hidden,display:getComputedStyle(e).display};
+      }
+      var v=window.visualViewport,b=Module.getScreenBounds(),c=Module.canvas.getBoundingClientRect(),p=Module.panVisual;return {build:Module.buildInfo,time:new Date().toISOString(),bounds:b,viewport:{layout:Module.getLayoutViewport(),inner:[innerWidth,innerHeight],screen:[screen.width,screen.height],pixelRatio:devicePixelRatio,visual:v?{width:v.width,height:v.height,left:v.offsetLeft,top:v.offsetTop,scale:v.scale}:null},rendering:{native:[Module.canvas.width,Module.canvas.height],target:Module.adaptiveTarget,resize:Module.viewportResize,zoom:Module.mapPresentation?.zoom,zoomState:{applied:Module.mapPresentation?.appliedZoom,native:Module.mapPresentation?.nativeZoom,rendered:p?.pixelFrame?.zoom,refining:!!Module.mapPresentation?.zooming,pending:Module.mapPresentation?.pendingNative||null},scale:Module.canvasScale,coverage:{width:c.width-b.width,height:c.height-b.height},coarse:!!p?.coarse,offset:p?[p.appliedX,p.appliedY]:null,panning:p?{drag:!!p.drag,held:!!p.held,nativeOwned:!!p.nativeOwned,pendingRest:!!p.rest?.pending,restAcknowledged:!!p.rest?.acknowledged,completed:p.presentSerial||0,fresh:p.pixelSerial||0,deferred:p.deferredFrames||0,recoveries:p.recoveries||0,nativeAgeMs:p.lastNativeAt?performance.now()-p.lastNativeAt:null,pixelAgeMs:p.lastPixelAt?performance.now()-p.lastPixelAt:null,lastRecovery:p.lastRecovery||null}:null,simulationFrame:Module.HEAPU8?.byteLength>0x834174?new DataView(Module.HEAPU8.buffer).getUint32(0x834170,true):null},history:Module.screenLayoutTrace.slice(),elements:elements,mobileUI:Module.mobileUI,course:!!Module.mobileState?.course,atTitle:!!Module.atTitle};
+    };
+    Module.openScreenDiagnostics=function(){var dialog=document.getElementById('screen-diagnostics');
+      if(!dialog){dialog=document.createElement('section');dialog.id='screen-diagnostics';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-label','Screen diagnostics');
+        dialog.style.cssText='position:fixed;z-index:1000;left:var(--screen-left,0px);top:var(--screen-top,0px);width:var(--screen-width,100%);height:var(--screen-height,100dvh);box-sizing:border-box;padding:24px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));background:#142219;color:white;overflow:auto;font:16px system-ui';
+        var heading=document.createElement('h2');heading.textContent='Screen diagnostics';var help=document.createElement('p');help.textContent='Share this layout report if controls disappear after folding. It contains screen measurements and the build label; no game files or saves.';
+        var report=document.createElement('textarea');report.readOnly=true;report.setAttribute('aria-label','Screen layout report');report.style.cssText='display:block;width:100%;height:50%;box-sizing:border-box;font:12px monospace';
+        var toolbar=document.createElement('div');toolbar.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:12px';
+        var copy=document.createElement('button');copy.id='screen-diagnostics-copy';copy.textContent='Copy diagnostics';copy.style.cssText='min-height:48px;font:inherit';
+        var status=document.createElement('span');status.id='screen-diagnostics-copy-status';status.setAttribute('role','status');
+        copy.onclick=async function(){copy.disabled=true;status.textContent='';
+          try {
+            try {if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');await navigator.clipboard.writeText(report.value);}
+            catch(error){report.focus();report.select();report.setSelectionRange(0,report.value.length);if(!document.execCommand('copy'))throw error;}
+            status.textContent='Copied';
+          } catch(error){status.textContent='Text selected. Use Copy from the text selection menu.';}
+          finally {copy.disabled=false;}
+        };
+        var close=document.createElement('button');close.textContent='Close diagnostics';close.style.cssText='min-height:48px;font:inherit';close.onclick=function(){dialog.remove();};toolbar.append(copy,close,status);dialog.append(heading,help,toolbar,report);document.body.append(dialog);
+        for(var type of ['pointerdown','pointerup','pointermove','click','mousedown','mouseup','touchstart','touchmove','touchend','wheel','keydown','keyup'])dialog.addEventListener(type,function(e){e.stopPropagation();});
+      }
+      dialog.querySelector('textarea').value=JSON.stringify(Module.getScreenDiagnostics(),null,2);
+    };
+    var label=document.getElementById('build-label');label.style.pointerEvents='auto';label.setAttribute('role','button');label.tabIndex=0;label.setAttribute('aria-label','Screen diagnostics');label.addEventListener('click',Module.openScreenDiagnostics);label.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();Module.openScreenDiagnostics();}});
+  })();
   Module.headerHeight=function(){return document.getElementById('build-header').getBoundingClientRect().bottom;};
   new ResizeObserver(function(){dispatchEvent(new Event('simgolf-header-resize'));}).observe(document.getElementById('build-header'));
   // Original Windows strings are byte-oriented Windows-1252, including the
@@ -67,6 +154,7 @@
     var nativeWidth = 800, nativeHeight = 600, pending = false;
     function fit() {
       pending = false;
+      stage.classList.toggle('world-view',!!(Module.mobileUI && Module.mapPresentation?.course));
       var css = getComputedStyle(stage);
       var width = stage.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight);
       var height = stage.clientHeight - parseFloat(css.paddingTop) - parseFloat(css.paddingBottom);
@@ -75,17 +163,20 @@
       // the retained map buffers are tall/wide. Fit and centre that plane;
       // clip stale world pixels beyond it, keeping inverse canvas input exact.
       var legacy=(Module.mobileUI||Module.atTitle)&&!Module.mapPresentation?.course;
-      var scale = Math.min(width / (legacy?800:nativeWidth), height / (legacy?600:nativeHeight));
+      var header=legacy?document.getElementById('build-header').getBoundingClientRect().height:0;
+      var backup=document.getElementById('local-title-actions'),footer=legacy&&backup&&!backup.hidden?backup.getBoundingClientRect().height+16:0;
+      var scale = Math.min(width / (legacy?800:nativeWidth), Math.max(1,height-header-footer) / (legacy?600:nativeHeight));
       if (Module.mobileUI && Module.mapPresentation?.course) {
         var view=Module.mapPresentation;
         scale = view.baseScale * view.appliedZoom / (view.nativeZoom/4);
       }
       Module.canvas.style.width = nativeWidth * scale + 'px';
       Module.canvas.style.height = nativeHeight * scale + 'px';
-      Module.canvas.style.transform=legacy?'translate('+((nativeWidth-800)*scale/2)+'px,'+((nativeHeight-600)*scale/2)+'px)':'';
+      Module.canvasBaseTransform=legacy?'translate('+((nativeWidth-800)*scale/2)+'px,'+((nativeHeight-600)*scale/2+(header-footer)/2)+'px)':'';
+      Module.canvas.style.transform=Module.canvasBaseTransform;
       Module.canvas.style.clipPath=legacy?'inset(0 '+((nativeWidth-800)/nativeWidth*100)+'% '+((nativeHeight-600)/nativeHeight*100)+'% 0)':'';
-      Module.uiPresentation=legacy?{width:800,height:600,scale:scale}:null;
-      Module.canvasScale = scale;
+      Module.uiPresentation=legacy?{width:800,height:600,scale:scale,header:header,footer:footer}:null;
+      Module.canvasScale = scale;Module.applySmoothPan?.(true);
     }
     function schedule() { if (!pending) { pending = true; requestAnimationFrame(fit); } }
     Module.fitCanvas = function (width, height) {
@@ -94,6 +185,8 @@
     Module.refreshCanvasPresentation = fit;
     addEventListener('resize', schedule);
     addEventListener('orientationchange', schedule);
+    addEventListener('simgolf-header-resize',schedule);
+    addEventListener('simgolf-screen-resize',schedule);
     if (window.visualViewport) window.visualViewport.addEventListener('resize', schedule);
     if (typeof ResizeObserver !== 'undefined') new ResizeObserver(schedule).observe(stage);
     schedule();
@@ -117,7 +210,7 @@
     };
     Module.touchQueue = [];
     var canvas = Module.canvas, stage = document.getElementById('game-stage');
-    var gesture = null, debounce, measuring = false, fingers = new Map(), pinch = null, blocked = false;
+    var gesture = null, debounce, measuring = false, fingers = new Map(), pinch = null, twoFingerFrame = 0, blocked = false;
     Module.mapPresentation = {course:false, zoom:1, appliedZoom:1, nativeZoom:4, baseScale:1};
     // Use the physical screen's short CSS side, not the orientation-dependent
     // fitting ratio. Magnification is a uniform close-up of the rendered world;
@@ -125,20 +218,32 @@
     function baseScale() {
       return Math.max(1, Math.min(screen.width,screen.height)) / 600;
     }
+    function nativeDetail(zoom){
+      if(zoom>=1)return 4;
+      var b=Module.getScreenBounds(),wide=b.width>b.height,maxWidth=wide?1920:1600,maxHeight=wide?1600:1920;
+      // Retain the finest original artwork that can cover this display with
+      // pan overscan inside the existing allocation budget. A fixed1x cutoff
+      // unnecessarily enlarged half-detail sprites on otherwise fitting views.
+      for(var detail of [4,2]){var scale=baseScale()*zoom/(detail/4);
+        if(maxWidth*scale>=b.width+96&&maxHeight*scale>=b.height+96)return detail;
+      }
+      return 1;
+    }
     Module.setMapZoom = function(value) {
       var view=Module.mapPresentation;
       if(!Number.isFinite(value))return;
+      var constructing=Module.mobileUI&&Module.mobileState?.constructing,minimum=constructing?1:.25;
+      var targetZoom=Math.max(minimum,Math.min(3,value));
+      if(targetZoom!==view.zoom&&!view.zooming)Module.resetSmoothPan?.('zoom');
+      view.zooming=true;
       if(Module.aimMode)Module.setAimMode(false);
       if(Module.lotMode)Module.setLotMode(false);
       if(Module.terrainMode)Module.setTerrainMode(false);
-      var constructing=Module.mobileUI&&Module.mobileState?.constructing;
-      var minimum=constructing?1:.25;
-      view.zoom=Math.max(minimum,Math.min(3,value));view.changed=Date.now();
+      view.zoom=targetZoom;view.changed=Date.now();
       if(constructing&&value<1)Module.mapZoomNotice={text:'Build: 1× minimum',until:Date.now()+2400};
-      var nativeZoom=view.zoom>=1?4:view.zoom>=.5?2:1;
-      Module.menuQueue=Module.menuQueue.filter(function(c){return c[0]!==11;});
-      if(nativeZoom===view.nativeZoom&&!view.pendingNative)view.appliedZoom=view.zoom;
-      view.serial=(view.serial||0)+1;view.pendingNative=nativeZoom;Module.menuQueue.push([11,nativeZoom]);
+      // Scale the last complete map immediately. Native detail changes and
+      // buffer reallocations settle once the gesture/wheel input is quiet.
+      view.appliedZoom=view.zoom;
       Module.refreshCanvasPresentation();schedule();
     };
     Module.updateMapPresentation = function(course) {
@@ -150,7 +255,7 @@
       if(!view.pendingNative&&nativeZoom!==view.nativeZoom){
         // Original keyboard/fallback commands remain valid inputs to the same
         // scale. A queued gesture already supplied its desired overall zoom.
-        if(!changed)view.zoom=Math.max(.25,Math.min(3,view.zoom*nativeZoom/view.nativeZoom));
+        if(!changed&&!view.zooming)view.zoom=Math.max(.25,Math.min(3,view.zoom*nativeZoom/view.nativeZoom));
         view.nativeZoom=nativeZoom;view.appliedZoom=view.zoom;changed=true;
       }
       var ownershipChanged=view.course!==!!course||view.mobileUI!==Module.mobileUI;
@@ -159,9 +264,14 @@
       if(ownershipChanged){Module.cancelMapGesture();if(!course&&Module.aimMode)Module.setAimMode(false);}
       Module.refreshCanvasPresentation();schedule();
     };
-    function queue(type, x, y, distance) {
+    Module.mapZoomFrameReady=function(frame){
+      var v=Module.mapPresentation;if(!v.zooming)return;
+      if(!pinch&&!v.pendingNative&&frame.valid&&frame.zoom===nativeDetail(v.zoom)&&frame.width===canvas.width&&frame.height===canvas.height&&Module.viewportResize?.status===1&&Module.viewportResize.seq===Module.viewportRequest?.seq){v.zooming=false;}
+    };
+    function queue(type, x, y, distance, mode, inputFrame) {
       var q = Module.touchQueue;
-      var event = [type, x|0, y|0, distance|0, measuring|0];
+      var event = [type, x|0, y|0, distance|0, mode===undefined?measuring|0:mode|0];
+      var frame=inputFrame===undefined?Module.panVisual?.frame:inputFrame;event.push(frame?.valid?1:0,frame?.x||0,frame?.y||0,frame?.rotation||0,frame?.zoom||0,frame?.width||0,frame?.height||0,Module.panVisual?.serial||0);
       if ((type===0||type===2||type===8||type===14) && q.length && q[q.length-1][0] === type) q[q.length-1] = event;
       else if (q.length < 128) q.push(event);
       else { q.length = 0; q.push([4,0,0,0,0]); }
@@ -169,7 +279,9 @@
     var directions=new Map();
     function releaseDirections(){directions.forEach(function(v){queue(7,v,0,0);});directions.clear();}
     Module.cancelMapGesture = function () {
+      Module.releaseSmoothPan?.(false);
       gesture = null;
+      cancelAnimationFrame(twoFingerFrame);twoFingerFrame=0;
       pinch=null;blocked=fingers.size>0;
       Module.lotPreview=null;Module.lotPending=false;Module.terrainPreview=null;
       Module.touchQueue.length = 0;
@@ -206,6 +318,7 @@
     };
     Module.refreshAimTarget=function(){var t=Module.aimTarget;if(Module.aimMode&&t)queue(8,t.x,t.y,Module.aimSerial);};
     Module.setAimMode=function(enabled){
+      if(enabled)Module.resetSmoothPan?.('precise-tool');
       if(Module.terrainMode)Module.setTerrainMode(false);
       Module.cancelMapGesture();Module.aimMode=!!enabled&&!!Module.mobileState?.shotTurn&&!Module.mobileState?.photoActive;measuring=Module.aimMode?3:0;Module.mapMode=measuring;
       if(Module.aimMode){var r=stage.getBoundingClientRect(),t=nativePoint({clientX:r.left+r.width/2,clientY:r.top+r.height/2});Module.setAimTarget(t[0],t[1]);}
@@ -235,6 +348,7 @@
       var t=Module.terrainTarget;if(Module.terrainMode&&t&&Module.terrainPreview?.serial!==Module.terrainSerial&&!Module.touchQueue.some(e=>e[0]===14&&e[3]===Module.terrainSerial)){Module.touchQueue=Module.touchQueue.filter(e=>e[0]!==14);queue(14,t.x,t.y,Module.terrainSerial);}
     };
     Module.setTerrainMode=function(enabled){
+      if(enabled)Module.resetSmoothPan?.('precise-tool');
       if(enabled){if(Module.aimMode)Module.setAimMode(false);if(Module.lotMode)Module.setLotMode(false);}
       Module.cancelMapGesture();Module.terrainMode=!!enabled&&!!Module.mobileState?.course&&!!Module.mobileState?.elevation&&!Module.mobileState?.photoActive;measuring=Module.terrainMode?5:0;Module.mapMode=measuring;Module.terrainView=terrainViewStamp();
       if(Module.terrainMode){var r=stage.getBoundingClientRect(),bar=document.getElementById('mobile-terrain-controls'),bottom=bar&&!bar.hidden?Math.min(r.bottom,bar.getBoundingClientRect().top-12):r.bottom,top=Math.max(r.top,Module.headerHeight()),t=nativePoint({clientX:r.left+r.width/2,clientY:top+(bottom-top)/2});Module.setTerrainTarget(t[0],t[1]);}else Module.terrainTarget=null;
@@ -261,6 +375,7 @@
       if(Module.lotMode&&Module.lotView!==lotViewStamp()){Module.cancelMapGesture();Module.lotView=lotViewStamp();Module.centreLotTarget();return;}
       var t=Module.lotTarget;if(Module.lotMode&&t&&!Module.lotPending&&Module.lotPreview?.serial!==Module.lotSerial&&!Module.touchQueue.some(e=>e[0]===11))queue(11,t.x,t.y,Module.lotSerial);};
     Module.setLotMode=function(enabled){
+      if(enabled)Module.resetSmoothPan?.('precise-tool');
       Module.cancelMapGesture();Module.lotMode=!!enabled&&[1,2,4,5,6,7,8,9,10,11,12,13,14,16,19].includes(Module.mobileState?.object)&&Module.mobileState?.course;measuring=Module.lotMode?4:0;Module.mapMode=measuring;Module.lotView=lotViewStamp();
       if(Module.lotMode){var r=stage.getBoundingClientRect(),t=nativePoint({clientX:r.left+r.width/2,clientY:r.top+r.height/2});Module.setLotTarget(t[0],t[1]);}else Module.lotTarget=null;
     };
@@ -272,6 +387,8 @@
     Module.lotEdgeActive=function(){return !!(Module.lotMode&&gesture?.lotStart&&fingers.size===1&&!pinch&&!blocked&&!Module.lotPending&&!document.hidden);};
     addEventListener('resize',function(){if(Module.aimMode)Module.setAimMode(false);if(Module.lotMode)Module.setLotMode(false);
       if(Module.terrainMode)Module.setTerrainMode(false);});
+    // Changed screen coordinates invalidate a held two-finger anchor.
+    addEventListener('simgolf-screen-resize',function(){if(pinch)Module.cancelMapGesture();});
     // Edge scrolling belongs to an active Aim drag, never a released/locked
     // target. Native polling applies the ordinary bounded camera transform.
     Module.aimEdgeActive=function(){return !!(Module.aimMode&&gesture?.aimStart&&fingers.size===1&&!pinch&&!blocked&&!Module.shotPending&&!document.hidden&&!Module.mobileState?.photoActive&&Module.mobileState?.shotTurn);};
@@ -288,8 +405,35 @@
       if(y-top<edge)direction|=2;else if(bottom-y<edge)direction|=8;
       if(direction){if(terrain){Module.terrainPreview=null;queue(16,direction,0,Module.terrainSerial);}else if(lot){Module.lotPreview=null;queue(13,direction,0,Module.lotSerial);}else{Module.aimAck=null;queue(10,direction,0,Module.aimSerial);}}
     },110);
+    function twoFingerSample(){
+      var points=Array.from(fingers.values());
+      return {x:(points[0].x+points[1].x)/2,y:(points[0].y+points[1].y)/2,distance:Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y)};
+    }
+    function updateTwoFinger(){
+      twoFingerFrame=0;if(!pinch||fingers.size!==2)return;
+      var point=twoFingerSample(),travel=Math.hypot(point.x-pinch.x,point.y-pinch.y),spread=Math.abs(point.distance-pinch.distance);
+      // Group the pair's initial pointer updates before choosing intent. A
+      // gesture owns pan OR zoom until release, avoiding accidental zoom while
+      // dragging and one-finger construction when the first finger lifts.
+      if(!pinch.mode){
+        if(performance.now()-pinch.time<50){twoFingerFrame=requestAnimationFrame(updateTwoFinger);return;}
+        if(spread>=8&&spread>travel){pinch.mode='zoom';Module.resetSmoothPan?.('pinch');}
+        else if(travel>=8){pinch.mode='pan';Module.releaseSmoothPan?.(true);queue(1,pinch.point[0],pinch.point[1],0,6);}
+      }
+      if(pinch.mode==='zoom'){
+        var zoom=pinch.zoom*point.distance/pinch.distance;
+        if(Math.abs(zoom-Module.mapPresentation.zoom)>.001)Module.setMapZoom(zoom);
+      }else if(pinch.mode==='pan'){
+        var r=canvas.getBoundingClientRect(),p=[pinch.point[0]+(point.x-pinch.x)*canvas.width/r.width,pinch.point[1]+(point.y-pinch.y)*canvas.height/r.height];pinch.last=p;Module.updateSmoothDrag?.(point.x-pinch.x,point.y-pinch.y);queue(2,p[0],p[1],travel,6);
+      }
+    }
+    function scheduleTwoFinger(){if(!twoFingerFrame)twoFingerFrame=requestAnimationFrame(updateTwoFinger);}
     function pointer(e) {
-      var mapMouse=e.pointerType==='mouse'&&Module.mobileUI&&Module.mobileState?.course&&(Module.mobileState?.roundActive||Module.terrainMode||Module.lotMode||Module.mapMode===2);
+      var mapMouse=e.pointerType==='mouse'&&e.button!==2&&!(e.buttons&2)&&Module.mobileUI&&Module.mobileState?.course;
+      if(active&&Module.mobileUI&&Module.mobileState?.course){
+        if(e.type==='pointerdown'&&!fingers.size)Module.holdSmoothPan?.();
+        else if(e.type!=='pointermove'&&e.type!=='pointerdown'&&!fingers.has(e.pointerId))Module.releaseSmoothPan?.(false);
+      }
       if (!active || (e.pointerType!=='touch'&&!mapMouse)) return;
       if(mapMouse&&e.type==='pointerdown'&&e.button!==0)return;
       if(mapMouse&&!Module.terrainMode&&!Module.aimMode&&!Module.lotMode&&e.type==='pointermove'&&!gesture){var q=nativePoint(e);queue(0,q[0],q[1],0);}
@@ -297,18 +441,23 @@
       if (e.type === 'pointerdown') {
         fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
         canvas.setPointerCapture(e.pointerId);
+        if(blocked&&!pinch)return;
         if(fingers.size===2 && Module.mobileUI && Module.mapPresentation.course) {
-          var points=Array.from(fingers.values());
-          var distance=Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y);
+          var point=twoFingerSample();
           if(Module.aimMode)Module.setAimMode(false);
           if(Module.lotMode)Module.setLotMode(false);
-      if(Module.terrainMode)Module.setTerrainMode(false);
+          if(Module.terrainMode)Module.setTerrainMode(false);
           Module.cancelMapGesture();
-          pinch={distance:Math.max(1,distance),zoom:Module.mapPresentation.zoom};return;
+          pinch={x:point.x,y:point.y,point:nativePoint({clientX:point.x,clientY:point.y}),distance:Math.max(1,point.distance),zoom:Module.mapPresentation.zoom,time:performance.now(),mode:''};return;
         }
+        if(fingers.size>2){Module.cancelMapGesture();return;}
         if (fingers.size!==1 || blocked) return;
+        // A newly-started pinch can supersede a pending refinement, but a
+        // lone tap must not build/aim against a different native projection.
+        var view=Module.mapPresentation,pixels=Module.panVisual?.pixelFrame;
+        if(view.zooming&&(view.pendingNative||!pixels||pixels.zoom!==view.nativeZoom||pixels.width!==canvas.width||pixels.height!==canvas.height||Module.viewportResize?.seq!==Module.viewportRequest?.seq)){gesture=null;return;}
         var p = nativePoint(e);
-        gesture = {id:e.pointerId,x:e.clientX,y:e.clientY,dist:0,point:p,sent:false};
+        gesture = {id:e.pointerId,x:e.clientX,y:e.clientY,dist:0,point:p,frame:Module.panVisual?.frame||null,sent:false,navigation:!Module.aimMode&&!Module.lotMode&&!Module.terrainMode&&Module.mapMode===0&&!Module.mobileState?.constructing};
         if(Module.terrainMode){gesture.terrainStart={...Module.terrainTarget};if(mapMouse)Module.setTerrainTarget(p[0],p[1]);}
         if(Module.lotMode){gesture.lotStart={...Module.lotTarget};if(mapMouse)Module.setLotTarget(p[0],p[1]);}
         if(Module.aimMode){gesture.aimStart={...Module.aimTarget};if(mapMouse)Module.setAimTarget(p[0],p[1]);}
@@ -318,16 +467,26 @@
         if(!fingers.has(e.pointerId))return;
         fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
         if(pinch) {
-          if(e.type==='pointermove'&&fingers.size===2) {
-            var points=Array.from(fingers.values());
-            Module.setMapZoom(pinch.zoom*Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y)/pinch.distance);
+          if(e.type==='pointermove')scheduleTwoFinger();
+          else {
+            cancelAnimationFrame(twoFingerFrame);twoFingerFrame=0;
+            if(e.type==='pointercancel'){Module.cancelMapGesture();}
+            else {
+              updateTwoFinger();cancelAnimationFrame(twoFingerFrame);twoFingerFrame=0;
+              if(pinch?.mode==='pan'){var p=pinch.last||pinch.point;queue(3,p[0],p[1],8,6);}
+              pinch=null;Module.releaseSmoothPan?.(false);
+            }
+            fingers.delete(e.pointerId);blocked=fingers.size>0;if(!fingers.size)Module.releaseSmoothPan?.(false);schedule();
           }
-          if(e.type!=='pointermove'){fingers.delete(e.pointerId);pinch=null;blocked=fingers.size>0;schedule();}
           return;
         }
         if (gesture && e.pointerId === gesture.id) {
         var p = nativePoint(e);
         gesture.dist = Math.max(gesture.dist,Math.hypot(e.clientX-gesture.x,e.clientY-gesture.y));
+        if(gesture.navigation&&gesture.dist>=8){
+          Module.releaseSmoothPan?.(true);Module.updateSmoothDrag?.(e.clientX-gesture.x,e.clientY-gesture.y);var r=canvas.getBoundingClientRect();
+          p=[gesture.point[0]+(e.clientX-gesture.x)*canvas.width/r.width,gesture.point[1]+(e.clientY-gesture.y)*canvas.height/r.height];
+        }
         if(gesture.terrainStart&&Module.terrainMode){
           if(e.type!=='pointercancel')Module.setTerrainTarget(mapMouse?p[0]:gesture.terrainStart.x+(p[0]-gesture.point[0])*.65,mapMouse?p[1]:gesture.terrainStart.y+(p[1]-gesture.point[1])*.65);
         }else if(gesture.lotStart&&Module.lotMode){
@@ -335,15 +494,15 @@
         }else if(gesture.aimStart&&Module.aimMode){
           if(e.type!=='pointercancel')Module.setAimTarget(mapMouse?p[0]:gesture.aimStart.x+(p[0]-gesture.point[0])*1.15,mapMouse?p[1]:gesture.aimStart.y+(p[1]-gesture.point[1])*1.15);
         }else{
-          if(!gesture.sent&&e.type!=='pointercancel'){queue(1,gesture.point[0],gesture.point[1],0);gesture.sent=true;}
+          if(!gesture.sent&&e.type!=='pointercancel'){queue(1,gesture.point[0],gesture.point[1],0,undefined,gesture.frame);gesture.sent=true;}
           queue(e.type === 'pointermove' ? 2 : e.type === 'pointerup' ? 3 : 4,p[0],p[1],gesture.dist);
         }
         if (e.type !== 'pointermove') gesture = null;
         }
-        if(e.type!=='pointermove'){fingers.delete(e.pointerId);if(!fingers.size)blocked=false;}
+        if(e.type!=='pointermove'){fingers.delete(e.pointerId);if(!fingers.size){blocked=false;Module.releaseSmoothPan?.(false);if(Module.mapPresentation.zooming)schedule();}}
       }
     }
-    ['mousedown','mouseup','mousemove','click','dblclick'].forEach(function(type){canvas.addEventListener(type,function(e){if(Module.mobileUI&&Module.mobileState?.course&&(Module.mobileState?.roundActive||Module.terrainMode||Module.lotMode||Module.mapMode===2)){e.preventDefault();e.stopImmediatePropagation();}},{capture:true,passive:false});});
+    ['mousedown','mouseup','mousemove','click','dblclick'].forEach(function(type){canvas.addEventListener(type,function(e){if(Module.mobileUI&&Module.mobileState?.course&&e.button!==2&&!(e.buttons&2)){e.preventDefault();e.stopImmediatePropagation();}},{capture:true,passive:false});});
     ['pointerdown','pointermove','pointerup','pointercancel'].forEach(function(type){canvas.addEventListener(type,pointer,{capture:true,passive:false});});
     canvas.addEventListener('wheel',function(e){
       if(!Module.mobileUI||!Module.mobileState?.course)return;
@@ -378,44 +537,261 @@
     }
     function target() {
       var css=getComputedStyle(stage), w=stage.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight), h=stage.clientHeight-parseFloat(css.paddingTop)-parseFloat(css.paddingBottom);
+      if(Module.mobileUI&&Module.mapPresentation?.course){var bounds=Module.getScreenBounds();w=bounds.width;h=bounds.height;}
       if(w<1||h<1)return null;
       var ratio=w/h, width=800, height=600;
       if(Module.mobileUI) {
         var view=Module.mapPresentation,scale=baseScale()*view.appliedZoom/(view.nativeZoom/4);
         Module.mapPresentation.baseScale=baseScale();
-        width=Math.min(1600,Math.max(800,Math.ceil(w/scale/2)*2));
-        height=Math.min(1920,Math.max(600,Math.ceil(h/scale/2)*2));
-        // One side is always at its original minimum; retain the proven native
-        // allocation contract, including unusual/small desktop debug windows.
-        if(width>800&&height>600)width=800;
+        // Rotate the existing pixel budget with the view. Portrait retains
+        // its accepted1600x1920 limit; landscape can use1920x1600, preserving
+        // the same maximum allocation and native tile scale.
+        var wide=w>h;
+        width=Math.min(wide?1920:1600,Math.max(800,Math.ceil(w/scale/2)*2+192));
+        height=Math.min(wide?1600:1920,Math.max(600,Math.ceil(h/scale/2)*2+192));
+        // Original world projection treats widths1024/1280 as different tile
+        // scales. Use the next even buffer width and crop the extra pixels,
+        // retaining original64x40 geometry and its inverse picker unchanged.
+        if(width===1024||width===1280)width+=2;
+        // Large/unfolded windows can need additional world on both axes at
+        // the same tile scale. The native boundary validates both dimensions
+        // and allocates all replacement buffers before committing them.
         return {width:width,height:height,cssWidth:w,cssHeight:h,scale:scale};
       }
       if(ratio>=4/3)width=Math.min(1600,Math.max(800,Math.round(600*ratio/2)*2));
       else height=Math.min(1920,Math.max(600,Math.round(800/ratio/2)*2));
+      if(width===1024||width===1280)width+=2;
       return {width:width,height:height,cssWidth:w,cssHeight:h};
     }
     function request() {
-      if(!active || document.hidden || pinch || (window.visualViewport && visualViewport.scale !== 1))return;
+      if(!active || document.hidden)return;
       var next=target(); if(!next)return;
-      if(fingers.size) {
-        if(Module.adaptiveTarget&&next.cssWidth===Module.adaptiveTarget.cssWidth&&next.cssHeight===Module.adaptiveTarget.cssHeight)return;
-        Module.cancelMapGesture();fingers.clear();blocked=false;
+      var rect=canvas.getBoundingClientRect(),visible=Module.getScreenBounds();
+      var covered=!Module.mapPresentation.course||(rect.left<=visible.left+1&&rect.top<=visible.top+1&&rect.right>=visible.left+visible.width-1&&rect.bottom>=visible.top+visible.height-1);
+      if(pinch)return;
+      var view=Module.mapPresentation;
+      if(Module.mobileUI&&view.course&&view.zooming){
+        var desired=nativeDetail(view.zoom);
+        if(view.pendingNative)return;
+        if(view.nativeZoom!==desired){
+          view.serial=(view.serial||0)+1;view.pendingNative=desired;
+          Module.menuQueue=Module.menuQueue.filter(function(c){return c[0]!==11;});Module.menuQueue.push([11,desired]);return;
+        }
       }
+      if(fingers.size) {
+        if(covered&&Module.adaptiveTarget&&next.cssWidth===Module.adaptiveTarget.cssWidth&&next.cssHeight===Module.adaptiveTarget.cssHeight)return;
+        // A native zoom/detail change can outgrow the previous buffer before
+        // a new gesture releases. Cancel that gesture, preserve its fingers
+        // until release, and let the validated native resize restore coverage.
+        Module.cancelMapGesture();
+      }
+      // Keep a slightly larger, already-covering buffer rather than reallocating
+      // for tiny zoom changes. Bound retained work to15% above the target area.
+      if(covered&&canvas.width>=next.width&&canvas.height>=next.height&&canvas.width*canvas.height<=next.width*next.height*1.15){next.width=canvas.width;next.height=canvas.height;}
       Module.adaptiveTarget=next;
       Module.refreshCanvasPresentation();
       var old=Module.viewportRequest;
       if(!old || old.width!==next.width || old.height!==next.height) {
-        Module.cancelMapGesture();Module.requestViewport(next.width,next.height);
+        if(view.course&&view.changed)view.zooming=true;Module.cancelMapGesture();Module.requestViewport(next.width,next.height);
       }
     }
     function schedule(){clearTimeout(debounce);debounce=setTimeout(request,180);}
-    addEventListener('resize',schedule);addEventListener('orientationchange',schedule);
+    addEventListener('resize',schedule);addEventListener('orientationchange',schedule);addEventListener('simgolf-screen-resize',schedule);
     function cancelAll(){Module.cancelMapGesture();fingers.clear();blocked=false;}
     addEventListener('blur',cancelAll);
     document.addEventListener('visibilitychange',function(){cancelAll();schedule();});
     if(window.visualViewport)visualViewport.addEventListener('resize',schedule);
     if(typeof ResizeObserver!=='undefined')new ResizeObserver(schedule).observe(stage);
     schedule();
+  })();
+
+  // Interpolate only the map bitmap between real native presentations. The
+  // integer camera, simulation and original projection/picker stay native.
+  (function(){
+    var state=Module.panVisual={x:0,y:0,appliedX:0,appliedY:0,held:false,navigation:false,recent:0,frame:null,drag:null,nativeOwned:false,serial:0,raf:0,dragRaf:0,time:0,samples:0};
+    // A single visible 2D surface commits native pixels and camera offset in
+    // one drawing operation. The transparent native canvas retains its exact
+    // input rectangle; submitted pixels and their offset stay together.
+    var display=document.createElement('canvas');display.id='map-display';display.hidden=true;
+    display.setAttribute('aria-hidden','true');display.style.cssText='position:fixed;z-index:1;pointer-events:none;image-rendering:pixelated';document.body.appendChild(display);
+    var output=display.getContext('2d',{alpha:false}),cache=document.createElement('canvas'),cacheContext=cache.getContext('2d',{alpha:false}),pixels=null,pixelFrame=null,pixelSerial=0,lastPaint=null;
+    function hideDisplay(){display.hidden=true;Module.canvas.style.opacity='';state.atomic=false;lastPaint=null;}
+    function capture(frame){
+      if(!frame.valid||!frame.rgba||!output||!cacheContext){pixelFrame=null;hideDisplay();return false;}
+      try {
+        var ptr=frame.rgba>>>0,count=frame.width*frame.height*4,heap=Module.HEAPU8;
+        if(!heap||frame.width<1||frame.height<1||ptr+count>heap.byteLength)throw Error('Invalid native map pixel range');
+        if(cache.width!==frame.width||cache.height!==frame.height){cache.width=frame.width;cache.height=frame.height;pixels=cacheContext.createImageData(frame.width,frame.height);}
+        pixels.data.set(heap.subarray(ptr,ptr+count));cacheContext.putImageData(pixels,0,0);pixelFrame=frame;pixelSerial++;state.pixelSerial=pixelSerial;state.lastPixelAt=performance.now();state.pixelFrame={x:frame.x,y:frame.y,zoom:frame.zoom,width:frame.width,height:frame.height};return true;
+      }catch(error){pixelFrame=null;Module.mapCopyError=String(error);hideDisplay();return false;}
+    }
+    function paint(){
+      var canvas=Module.canvas;
+      if(!pixelFrame||Module.uiPresentation||!Module.mobileUI||!Module.mapPresentation?.course||(!Module.mapPresentation.zooming&&(pixelFrame.width!==canvas.width||pixelFrame.height!==canvas.height))){hideDisplay();return;}
+      var b=Module.getScreenBounds(),r=canvas.getBoundingClientRect(),ratio=Math.min(devicePixelRatio||1,Math.max(1,1/(Module.canvasScale||1))),w=Math.max(1,Math.round(b.width*ratio)),h=Math.max(1,Math.round(b.height*ratio));
+      // Acknowledged native zoom can precede its completed pixels. Normalize
+      // using the cached frame's own detail level, never the pending level.
+      if(Module.mapPresentation.zooming||pixelFrame.zoom!==Module.mapPresentation.nativeZoom){
+        var v=Module.mapPresentation,scale=v.baseScale*v.appliedZoom/(pixelFrame.zoom/4),cw=pixelFrame.width*scale,ch=pixelFrame.height*scale;
+        r={left:b.left+(b.width-cw)/2,top:b.top+(b.height-ch)/2,width:cw,height:ch};
+      }
+      var key=[pixelSerial,b.left,b.top,b.width,b.height,r.left,r.top,r.width,r.height,ratio].join(',');
+      if(lastPaint===key)return;lastPaint=key;
+      if(display.width!==w||display.height!==h){display.width=w;display.height=h;}
+      display.style.left=b.left+'px';display.style.top=b.top+'px';display.style.width=b.width+'px';display.style.height=b.height+'px';
+      output.setTransform(w/b.width,0,0,h/b.height,0,0);output.imageSmoothingEnabled=Module.mapPresentation.appliedZoom<1;display.style.imageRendering=Module.mapPresentation.appliedZoom<1?'auto':'pixelated';output.clearRect(0,0,b.width,b.height);
+      output.drawImage(cache,r.left-b.left,r.top-b.top,r.width,r.height);
+      state.paintSerial=(state.paintSerial||0)+1;state.displayRatio=ratio;state.atomic=true;display.hidden=false;canvas.style.opacity='0';
+    }
+    function apply(refitted){
+      if(refitted)state.appliedX=state.appliedY=0;
+      var canvas=Module.canvas;
+      if(Module.uiPresentation||!Module.mobileUI||!Module.mapPresentation?.course){canvas.style.transform=Module.canvasBaseTransform||'';state.appliedX=state.appliedY=0;hideDisplay();return;}
+      var r=canvas.getBoundingClientRect(),b=Module.getScreenBounds(),left=r.left-state.appliedX,top=r.top-state.appliedY;
+      var limitX=left<=b.left&&left+r.width>=b.left+b.width,limitY=top<=b.top&&top+r.height>=b.top+b.height;
+      var x=limitX?Math.max(b.left+b.width-left-r.width,Math.min(b.left-left,state.x)):0;
+      var y=limitY?Math.max(b.top+b.height-top-r.height,Math.min(b.top-top,state.y)):0;
+      var ratio=devicePixelRatio||1;state.appliedX=Math.round(x*ratio)/ratio;state.appliedY=Math.round(y*ratio)/ratio;
+      canvas.style.transform='translate3d('+state.appliedX+'px,'+state.appliedY+'px,0)';paint();
+    }
+    // Only deliberate native/automatic camera changes interpolate. A released
+    // drag retains its fractional view instead of easing onto the tile grid.
+    function tick(now){state.raf=0;if(state.held||state.drag||state.rest)return;
+      var dt=Math.max(0,Math.min(50,now-state.time));state.time=now;
+      var decay=Math.exp(-dt/32);state.x*=decay;state.y*=decay;
+      if(Math.abs(state.x)<.08)state.x=0;if(Math.abs(state.y)<.08)state.y=0;
+      apply();state.samples++;if(state.x||state.y)state.raf=requestAnimationFrame(tick);
+    }
+    function run(){if(!state.held&&!state.drag&&!state.rest&&!state.raf&&(state.x||state.y)){state.time=performance.now();state.raf=requestAnimationFrame(tick);}}
+    Module.applySmoothPan=apply;
+    Module.resetSmoothPan=function(reason){cancelAnimationFrame(state.raf);cancelAnimationFrame(state.dragRaf);state.raf=state.dragRaf=0;state.x=state.y=0;state.held=false;state.navigation=false;state.drag=null;state.nativeOwned=false;state.frame=null;state.rest=null;state.coverageWait=null;state.settleTarget=null;state.pendingRelease=null;state.coarse=false;Module.smoothPanRequest=null;state.reason=reason;apply();};
+    Module.holdSmoothPan=function(){state.serial++;state.nativeOwned=false;cancelAnimationFrame(state.raf);cancelAnimationFrame(state.dragRaf);state.raf=state.dragRaf=0;state.drag=null;state.settleTarget=null;state.pendingRelease=null;Module.smoothPanRequest=null;state.held=true;state.navigation=false;apply();};
+    function project(dx,dy,frame){var x=dx,y=dy;switch(frame.rotation&7){case 2:x=dy;y=-dx;break;case 4:x=-dx;y=-dy;break;case 6:x=-dy;y=dx;}
+      var scale=(Module.canvasScale||1)*frame.zoom/4;return {x:-32*(x+y)*scale,y:-20*(y-x)*scale};
+    }
+    function cameraFor(px,py,frame){
+      var scale=(Module.canvasScale||1)*frame.zoom/4;px/=scale;py/=scale;
+      var x=-px/64+py/40,y=-px/64-py/40,wx=x,wy=y;switch(frame.rotation&7){case 2:wx=-y;wy=x;break;case 4:wx=-x;wy=-y;break;case 6:wx=y;wy=-x;break;}
+      return {x:Math.max(0,Math.min(49,frame.x+wx)),y:Math.max(0,Math.min(49,frame.y+wy))};
+    }
+    function desired(d){var c=cameraFor(d.startX+d.dx,d.startY+d.dy,d.frame);return project(c.x-d.frame.x,c.y-d.frame.y,d.frame);}
+    function requestCamera(d,lead){
+      var f=state.frame;if(!f||!d.accepted)return;
+      var target=desired(d),dx=target.x-d.viewX,dy=target.y-d.viewY,r=Module.canvas.getBoundingClientRect(),b=Module.getScreenBounds(),scale=(Module.canvasScale||1)*f.zoom/4;
+      // The next native bitmap must still cover the current visible camera.
+      // Keep lead inside spare coverage, including original tile rounding.
+      var mx=Math.max(0,Math.min(32,(r.width-b.width)/2-32*scale)),my=Math.max(0,Math.min(32,(r.height-b.height)/2-20*scale));
+      var amount=lead?Math.min(1,dx?mx/Math.abs(dx):1,dy?my/Math.abs(dy):1):0;
+      var c=cameraFor(d.viewX+dx*amount,d.viewY+dy*amount,d.frame);
+      state.coarse=r.width-b.width<64*scale||r.height-b.height<40*scale;
+      if(lead&&state.coarse){
+        // At a native size cap there may be no spare bitmap to translate.
+        // Retain navigation with bounded original tile steps, never deadlock.
+        var wanted=cameraFor(target.x,target.y,d.frame);
+        c.x=f.x+Math.max(-1,Math.min(1,Math.round(wanted.x)-f.x));c.y=f.y+Math.max(-1,Math.min(1,Math.round(wanted.y)-f.y));
+      }
+      Module.smoothPanRequest={x:Math.round(c.x),y:Math.round(c.y),serial:d.serial,rotation:f.rotation,zoom:f.zoom,width:f.width,height:f.height};
+    }
+    function dragOffset(){var d=state.drag,f=state.frame;if(!d||!f)return;
+      var drawn=project(f.x-d.frame.x,f.y-d.frame.y,f);state.x=d.viewX-drawn.x;state.y=d.viewY-drawn.y;apply();
+      d.viewX=drawn.x+state.appliedX;d.viewY=drawn.y+state.appliedY;requestCamera(d,true);
+    }
+    function dragTick(now){state.dragRaf=0;var d=state.drag;if(!d?.accepted)return;
+      if(now-d.time<15){state.dragRaf=requestAnimationFrame(dragTick);return;}
+      var dt=Math.max(0,Math.min(32,now-d.time));d.time=now;var target=desired(d),dx=target.x-d.viewX,dy=target.y-d.viewY,length=Math.hypot(dx,dy);
+      // Slow input follows directly. Fast or delayed input consumes only a
+      // bounded step per display frame, rather than replaying old positions.
+      var amount=length?Math.min(1,Math.min(32,dt*1.5)/length):0;
+      d.viewX+=dx*amount;d.viewY+=dy*amount;dragOffset();state.dragFrames=(state.dragFrames||0)+1;
+      target=desired(d);if(Math.hypot(target.x-d.viewX,target.y-d.viewY)>.2)state.dragRaf=requestAnimationFrame(dragTick);
+    }
+    function scheduleDrag(){if(state.drag?.accepted&&!state.dragRaf){state.drag.time=performance.now();state.dragRaf=requestAnimationFrame(dragTick);}}
+    function keepRest(frame){
+      var rest=state.rest;if(!rest)return false;
+      if(rest.acknowledged&&((frame.requestedX!==undefined&&frame.requestedX!==rest.target.x)||(frame.requestedY!==undefined&&frame.requestedY!==rest.target.y))){state.rest=null;return false;}
+      if(!rest.pending&&(frame.x!==rest.target.x||frame.y!==rest.target.y)){state.rest=null;return false;}
+      if(rest.acknowledged&&state.presentSerial>rest.ackFrame&&frame.x===rest.target.x&&frame.y===rest.target.y)rest.pending=false;
+      var offset=project(rest.camera.x-frame.x,rest.camera.y-frame.y,frame);state.x=offset.x;state.y=offset.y;apply();return true;
+    }
+    Module.finishSmoothPan=function(serial,x,y){
+      var rest=state.rest?.serial===serial?state.rest:state.drag?.previousRest;if(rest?.serial!==serial)return;
+      rest.target={x:x,y:y};rest.acknowledged=true;rest.ackFrame=state.presentSerial||0;
+    };
+    Module.releaseSmoothPan=function(navigation){state.held=false;state.navigation=!!navigation;
+      if(navigation){state.recent=performance.now();if(!state.drag&&state.frame?.valid){cancelAnimationFrame(state.raf);state.raf=0;var previousRest=state.rest;state.rest=null;state.drag={frame:state.frame,startX:state.appliedX,startY:state.appliedY,viewX:state.appliedX,viewY:state.appliedY,dx:0,dy:0,serial:state.serial,previousRest:previousRest,accepted:state.nativeOwned};}}
+      else {
+        var d=state.drag;
+        if(d&&state.frame){
+          // Stop at the last displayed point, including a swipe which finishes
+          // before native input acknowledges it. Never replay an unseen tail.
+          var c=cameraFor(d.viewX,d.viewY,d.frame),f=state.frame;
+          state.rest={camera:c,target:{x:Math.round(c.x),y:Math.round(c.y)},serial:d.serial,pending:true,acknowledged:false};
+          if(d.accepted)requestCamera(d,false);
+          else state.pendingRelease={x:Math.round(c.x),y:Math.round(c.y),serial:d.serial,rotation:f.rotation,zoom:f.zoom,width:f.width,height:f.height};
+        }
+        cancelAnimationFrame(state.dragRaf);cancelAnimationFrame(state.raf);state.dragRaf=state.raf=0;state.drag=null;
+      }
+      run();
+    };
+    Module.updateSmoothDrag=function(dx,dy){if(state.drag){state.drag.dx=dx;state.drag.dy=dy;scheduleDrag();}};
+    Module.acceptSmoothDrag=function(accepted,serial){if(serial&&serial!==state.serial)return;state.nativeOwned=!!accepted;if(!state.drag){if(accepted&&state.pendingRelease?.serial===serial)Module.smoothPanRequest=state.pendingRelease;state.pendingRelease=null;return;}if(accepted){state.drag.accepted=true;dragOffset();scheduleDrag();}else{var previousRest=state.drag.previousRest;state.drag=null;state.rest=previousRest||null;Module.smoothPanRequest=null;cancelAnimationFrame(state.dragRaf);state.dragRaf=0;state.navigation=false;run();}};
+    // Rendering may yield while the finger reverses. Keep the last complete
+    // bitmap if an in-flight native frame no longer covers the visible view.
+    // A later camera request brings usable coverage; never clamp the view to
+    // the obsolete bitmap or expose an unfinished native drawing surface.
+    function uncoveredPanFrame(frame,previous){
+      if(!previous?.valid||!frame.valid||!frame.rgba||!Module.mobileUI||Module.uiPresentation||!Module.mapPresentation?.course||Module.aimMode||Module.lotMode||Module.terrainMode||frame.rotation!==previous.rotation||frame.zoom!==previous.zoom||frame.width!==previous.width||frame.height!==previous.height)return false;
+      var d=state.drag,rest=state.rest,offset;
+      if(d){var drawn=project(frame.x-d.frame.x,frame.y-d.frame.y,frame);offset={x:d.viewX-drawn.x,y:d.viewY-drawn.y};}
+      else if(rest?.pending&&(!rest.acknowledged||((frame.requestedX===undefined||frame.requestedX===rest.target.x)&&(frame.requestedY===undefined||frame.requestedY===rest.target.y))))offset=project(rest.camera.x-frame.x,rest.camera.y-frame.y,frame);
+      else return false;
+      var r=Module.canvas.getBoundingClientRect(),b=Module.getScreenBounds(),left=r.left-state.appliedX,top=r.top-state.appliedY;
+      // At an existing native size cap no bitmap can cover the window. Keep
+      // its established coarse fallback rather than waiting indefinitely.
+      var scale=(Module.canvasScale||1)*frame.zoom/4;
+      if(r.width-b.width<64*scale||r.height-b.height<40*scale)return false;
+      if(left+offset.x<=b.left+.5&&left+r.width+offset.x>=b.left+b.width-.5&&top+offset.y<=b.top+.5&&top+r.height+offset.y>=b.top+b.height-.5)return false;
+      state.deferredFrames=(state.deferredFrames||0)+1;
+      if(d)requestCamera(d,true);
+      return true;
+    }
+    function deferUncoveredFrame(frame,previous){
+      if(!uncoveredPanFrame(frame,previous)){state.coverageWait=null;return false;}
+      var now=performance.now(),wait=state.coverageWait;
+      if(!wait||wait.serial!==state.serial)wait=state.coverageWait={serial:state.serial,start:now,frames:0};
+      wait.frames++;
+      if(wait.frames>=3&&now-wait.start>=350){
+        state.recoveries=(state.recoveries||0)+1;
+        state.lastRecovery={reason:'uncovered-pan-frame',time:now,frames:wait.frames};
+        state.coverageWait=null;return 'recover';
+      }
+      return true;
+    }
+    Module.onMapPresent=function(frame){state.presentSerial=(state.presentSerial||0)+1;state.lastNativeAt=performance.now();var previous=state.frame;
+      var disposition=deferUncoveredFrame(frame,previous);
+      if(disposition===true)return;
+      if(disposition==='recover'){
+        // A lost completion/ownership transition must not hide new frames
+        // forever. Cancel through the ordinary input queue, block remaining
+        // contacts until release, then show this complete native frame.
+        Module.cancelMapGesture?.();Module.resetSmoothPan('map-handoff-recovery');
+        if(capture(frame)){state.frame=frame;apply();}
+        return;
+      }
+      if(!capture(frame)){Module.resetSmoothPan('native-map-pixels-unavailable');return;}
+      Module.mapZoomFrameReady?.(frame);
+      var eligible=frame.valid&&Module.mobileUI&&Module.mapPresentation?.course&&!Module.aimMode&&!Module.lotMode&&!Module.terrainMode&&(!Module.mobileState?.constructing||state.rest||state.navigation||state.held||performance.now()-state.recent<180);
+      if(!eligible||!previous||!previous.valid||frame.rotation!==previous.rotation||frame.zoom!==previous.zoom||frame.width!==previous.width||frame.height!==previous.height){Module.resetSmoothPan('frame-context');state.frame=frame;return;}
+      state.frame=frame;if(state.drag){if(state.drag.accepted)dragOffset();else apply();return;}if(keepRest(frame))return;var dx=frame.x-previous.x,dy=frame.y-previous.y;if(!dx&&!dy){apply();return;}
+      if(Math.abs(dx)>3||Math.abs(dy)>3){Module.resetSmoothPan('camera-jump');state.frame=frame;return;}
+      var x=dx,y=dy;switch(frame.rotation&7){case 2:x=dy;y=-dx;break;case 4:x=-dx;y=-dy;break;case 6:x=-dy;y=dx;}
+      var scale=(Module.canvasScale||1)*frame.zoom/4;
+      state.x+=32*(x+y)*scale;state.y+=20*(y-x)*scale;
+      apply();run();
+    };
+    addEventListener('simgolf-screen-resize',function(){Module.resetSmoothPan('screen-change');});
+    document.addEventListener('visibilitychange',function(){if(document.hidden)Module.resetSmoothPan('hidden');});
+    addEventListener('blur',function(){Module.resetSmoothPan('blur');});
   })();
 
 </script>

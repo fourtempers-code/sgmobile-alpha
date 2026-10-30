@@ -1,4 +1,4 @@
-SimGolf Mobile — invited iPhone alpha
+SimGolf Mobile — Alpha version 1.2
 
 An unofficial mobile adaptation preserving original SimGolf gameplay.
 This project is not affiliated with the original game's creators or rights holders.
@@ -21,7 +21,8 @@ present but not yet independently accepted on iPhone. The original opening plays
 DEVICE
 Maintainer-tested device: iPhone15 Pro Max, reported iOS27.0.1, Safari/Home Screen.
 The app needs WebAssembly JSPI and private file storage; unsupported browsers
-receive an error. Other devices/iOS versions are part of the pilot, not guaranteed.
+receive an error. The maintainer also reports smooth panning/zooming on the unfolded Duo.
+Other devices/iOS versions are part of the pilot, not guaranteed.
 
 AFTER INSTALL
 Add to Home Screen after installation works. Keep a copy of your saves in Files.
@@ -33,7 +34,7 @@ Once app resources are stored, offline Home Screen launches/play/saves are
 accepted on the maintainer's phone. Close/reopen is needed for a real cold test.
 
 UPDATES
-Download a save backup first. If an update is downloaded, save and close all
+Download a save backup first. Use Check for updates on the welcome or title menu. If an update is downloaded, save and close all
 app windows/tabs at this address, then reopen. Verify the new build label and
 load your save. Updates do not intentionally clear original files or saves.
 Keep the previous backup until the new version has loaded/saved successfully.

@@ -229,9 +229,10 @@
   var saveInput = document.createElement('input'); saveInput.type = 'file'; saveInput.accept = '.sve'; saveInput.multiple = true; saveInput.id = 'local-save-import'; saveInput.setAttribute('aria-label', 'Import saved games');
   var saveList = node('div', ''), saveClose = node('button', 'Back to game'); saveClose.id = 'local-save-close'; saveClose.onclick = function () { saveRoot.hidden = true; };
   saveBox.append(saveHeading, saveInfo, saveInput, saveList, saveClose); saveRoot.append(saveBox); document.body.append(saveRoot);
-  css.textContent += '#local-save-files[hidden],#local-title-saves[hidden]{display:none!important}#local-save-files{position:fixed;inset:0;z-index:999;background:#142219;color:white;overflow:auto;padding:max(24px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));box-sizing:border-box;font:17px/1.5 system-ui,sans-serif}#local-save-files>div{max-width:650px;margin:auto}#local-save-files button,#local-title-saves{font:inherit;min-height:48px;padding:10px 14px;background:#385a39;color:white;border:1px solid #9ab69a;border-radius:8px;margin:6px 0}#local-save-files input{font:inherit;max-width:100%}#local-save-files .save-file{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #3d5941}#local-save-files .save-file span{overflow-wrap:anywhere}#local-title-saves{position:fixed;bottom:max(12px,env(safe-area-inset-bottom));right:max(12px,env(safe-area-inset-right));z-index:50}';
+  css.textContent += '#local-save-files[hidden],#local-title-actions[hidden],#local-title-saves[hidden]{display:none!important}#local-save-files{position:fixed;left:var(--screen-left,0px);top:var(--screen-top,0px);width:var(--screen-width,100%);height:var(--screen-height,100dvh);z-index:999;background:#142219;color:white;overflow:auto;padding:max(24px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));box-sizing:border-box;font:17px/1.5 system-ui,sans-serif}#local-save-files>div{max-width:650px;margin:auto}#local-save-files button,#local-title-saves{font:inherit;min-height:48px;padding:10px 14px;background:#385a39;color:white;border:1px solid #9ab69a;border-radius:8px;margin:6px 0}#local-save-files input{font:inherit;max-width:100%}#local-save-files .save-file{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #3d5941}#local-save-files .save-file span{overflow-wrap:anywhere}#local-title-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;position:fixed;left:calc(var(--screen-left,0px) + max(12px,env(safe-area-inset-left)));bottom:calc(var(--screen-bottom-gap,0px) + max(12px,env(safe-area-inset-bottom)));right:calc(var(--screen-right-gap,0px) + max(12px,env(safe-area-inset-right)));z-index:50}';
   for (var type of ['pointerdown','pointerup','pointermove','mousedown','mouseup','click','touchstart','touchmove','touchend','wheel','keydown','keyup','keypress']) saveRoot.addEventListener(type, function (e) { e.stopPropagation(); });
-  var titleSaves = node('button', 'Save files'); titleSaves.id = 'local-title-saves'; titleSaves.hidden = true; document.body.append(titleSaves);
+  var titleActions = node('div', ''); titleActions.id = 'local-title-actions'; titleActions.hidden = true;
+  var titleSaves = node('button', 'Save files'); titleSaves.id = 'local-title-saves'; titleSaves.hidden = true; titleActions.append(titleSaves); document.body.append(titleActions);
   function saveFolder() { return '/game/' + (FS.readdir('/game').find(function (d) { return d.toLowerCase() === 'saved games'; }) || 'Saved Games'); }
   function listSaves() {
     saveList.replaceChildren();
@@ -255,6 +256,7 @@
     saveRoot.hidden = false; saveInfo.textContent = 'Download a backup or import an original save. Existing files require confirmation before replacement.'; listSaves();
   };
   titleSaves.onclick = Module.openLocalSaves;
+  new ResizeObserver(function(){Module.refreshCanvasPresentation?.();}).observe(titleActions);
   saveInput.onchange = async function () {
     saveInput.disabled = true;
     try {
@@ -269,7 +271,7 @@
     } catch (e) { saveInfo.textContent = messageError(e); }
     finally { saveInput.disabled = false; saveInput.value = ''; }
   };
-  setInterval(function () { titleSaves.hidden = !(Module.localInstall.phase === 'ready' && Module.atTitle && Module.saveImport) || !saveRoot.hidden; }, 250);
+  setInterval(function () { titleSaves.hidden = titleActions.hidden = !(Module.localInstall.phase === 'ready' && Module.atTitle && Module.saveImport) || !saveRoot.hidden; }, 250);
   async function prepare() {
     if (!isSecureContext || typeof WebAssembly.Suspending !== 'function' || !navigator.storage?.getDirectory) {
       picker.hidden = true; throw new Error('This browser needs WebAssembly JSPI and private file storage. Try a supported Safari version over HTTPS.');

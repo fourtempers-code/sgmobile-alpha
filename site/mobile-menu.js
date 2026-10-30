@@ -60,7 +60,7 @@
     #mobile-lot-controls{position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 58px);display:flex;gap:10px;align-items:center;padding:8px;background:#142219f2;border-radius:6px;pointer-events:auto}#mobile-lot-controls div{flex:1;font-size:13px;line-height:1.4;text-align:center}#mobile-place-lot{flex:none;min-width:70px}
     #mobile-round-info{position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 220px);max-height:24vh;overflow:auto;padding:6px;background:#142219ed;border-radius:6px;font-size:13px;text-align:center;pointer-events:auto}
     @media(min-width:720px){#mobile-round-controls{left:calc(max(8px,env(safe-area-inset-left)) + 54px);bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 54px);right:180px}#mobile-shot-choices{bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 108px)}#mobile-round-info{bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 166px)}}
-    #mobile-course-badge{position:absolute;left:max(8px,env(safe-area-inset-left));top:max(8px,env(safe-area-inset-top));display:flex;align-items:center;gap:0;padding:5px 8px 5px 0;box-sizing:border-box;width:calc(100% - max(8px,env(safe-area-inset-left)) - max(8px,env(safe-area-inset-right)) - 64px);max-width:620px;min-height:78px;pointer-events:none;isolation:isolate}
+    #mobile-course-badge{position:absolute;left:max(8px,env(safe-area-inset-left));top:max(8px,env(safe-area-inset-top));display:flex;align-items:center;gap:0;padding:5px 8px 5px 0;box-sizing:border-box;width:calc(100% - max(8px,env(safe-area-inset-left)) - max(8px,env(safe-area-inset-right)) - 64px);max-width:none;min-height:78px;pointer-events:none;isolation:isolate}
     #mobile-course-badge:before{content:"";position:absolute;inset:0 0 0 28px;background:var(--mobile-surface);border-radius:6px;z-index:-1}
     #mobile-course-badge canvas{width:72px;height:72px;object-fit:contain;flex:none;margin-right:4px;image-rendering:pixelated}
     #mobile-course-details{min-width:0;flex:1;display:grid;grid-template-columns:minmax(0,1fr) max-content;grid-template-rows:26px 20px 20px;column-gap:8px;align-items:center}
@@ -90,7 +90,7 @@
     #mobile-open-hole{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 54px);bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px));width:48px;height:48px}
     #mobile-closeup{position:absolute;right:max(8px,env(safe-area-inset-right));bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--strip-space,0px) + 52px);background:#142219e8;border-radius:6px;padding:6px;pointer-events:none}
     #mobile-closeup output{min-width:40px;text-align:center}
-    #mobile-message{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 50px);left:max(8px,env(safe-area-inset-left));right:var(--mobile-rail-space);margin:0 auto;max-width:480px;max-height:24%;overflow:auto;white-space:pre-wrap;text-align:center;padding:8px;box-sizing:border-box;border-radius:5px;background:#142219ed;text-shadow:0 1px #000;pointer-events:auto}
+    #mobile-message{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 50px);left:max(8px,env(safe-area-inset-left));right:calc(max(8px,env(safe-area-inset-right)) + 64px);margin:0 auto;max-width:none;max-height:calc(100% - 160px);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4;text-align:center;padding:8px;box-sizing:border-box;border-radius:5px;background:#142219ed;text-shadow:0 1px #000;pointer-events:auto}
     #mobile-mode-rail button,#mobile-cancel,#mobile-ui > button,#mobile-camera button,#mobile-build-actions button,#mobile-round-controls button,#mobile-round-toggles button{background:var(--mobile-surface)}
     #mobile-mode-rail button[aria-pressed=true],#mobile-ui > button[aria-pressed=true],#mobile-camera button[aria-pressed=true],#mobile-build-actions button[aria-pressed=true],#mobile-round-controls button[aria-pressed=true],#mobile-round-toggles button[aria-pressed=true]{background:rgba(73,109,66,.7794)}
     body.mobile-rail-visible #mobile-profile,body.mobile-rail-visible #mobile-staff,body.mobile-rail-visible #mobile-match,body.mobile-rail-visible #mobile-load,body.mobile-rail-visible #local-save-files{padding-bottom:calc(max(8px,env(safe-area-inset-bottom)) + 60px)}
@@ -417,6 +417,7 @@
     }else if(page==='system'){
       if(Module.localFiles)add('Save files / backup',function(){open=false;render();Module.openLocalSaves();});
       key('Save game','S');key('Load game','L');action('Exit game',8,4);key(s.paused?'Resume game':'Pause game','P');
+      add('Screen diagnostics',function(){Module.openScreenDiagnostics();});
       add('Measure yardage',function(){mode(1);});add('Reset zoom',function(){Module.setMapZoom(1);});key('Next variation','\t');
       key('Save championship course','C');action('Preferences',8,1);
       add('Keyboard',function(){navigate('keyboard');});if(Module.saveHistoryUIEnabled)add('Save history / export',function(){Module.cancelMapGesture();open=false;render();if(Module.toggleSaveHistory)Module.toggleSaveHistory();});add(Module.mobileUI?'Show original controls':'Hide original controls',function(){Module.mobileUI=!Module.mobileUI;open=false;render();});
@@ -491,6 +492,9 @@
     var badgeSpace=courseBadge.hidden?0:courseBadge.getBoundingClientRect().height+8;
     if(!panel.classList.contains('landmarks')){panel.style.top='calc(max(8px,env(safe-area-inset-top)) + '+badgeSpace+'px)';panel.style.maxHeight='calc(100% - max(8px,env(safe-area-inset-top)) - '+badgeSpace+'px - max(8px,env(safe-area-inset-bottom)) - 8px)';}else{panel.style.top='';panel.style.maxHeight='';}
     message.style.top='calc(max(8px,env(safe-area-inset-top)) + '+Math.max(50,badgeSpace)+'px)';
+    var bounds=Module.getScreenBounds(),messageTop=Math.max(8,bounds.safe.top)+Math.max(50,badgeSpace);
+    var reserve=(strip.hidden?0:strip.getBoundingClientRect().height+8)+72;
+    message.style.maxHeight=Math.max(0,root.getBoundingClientRect().height-messageTop-Math.max(8,bounds.safe.bottom)-reserve)+'px';
   }
   function leaveKeyboard(){
     if(root.contains(document.activeElement)&&document.activeElement.tagName==='INPUT')document.activeElement.blur();
@@ -499,17 +503,17 @@
   // Safari can retain a visual-viewport offset after focusing a name field.
   // Keep controls inside that viewport, then restore the page after dismissal.
   function syncVisibleArea(){
-    var v=window.visualViewport;
+    var bounds=Module.getScreenBounds(),layout=Module.getLayoutViewport(),v={offsetLeft:bounds.left,offsetTop:bounds.top,width:bounds.width,height:bounds.height};
     var header=document.getElementById('build-header').getBoundingClientRect().height;root.style.top=((v?v.offsetTop:0)+header)+'px';root.style.left=(v?v.offsetLeft:0)+'px';
     root.style.right='auto';root.style.bottom='auto';root.style.width=(v?v.width:innerWidth)+'px';root.style.height=Math.max(0,(v?v.height:innerHeight)-header)+'px';
     rail.style.top='calc('+((v?v.offsetTop:0)+header)+'px + max(8px,env(safe-area-inset-top)))';
-    rail.style.right='calc('+Math.max(0,innerWidth-(v?v.offsetLeft+v.width:innerWidth))+'px + max(8px,env(safe-area-inset-right)))';
+    rail.style.right='calc('+Math.max(0,layout.width-(v?v.offsetLeft+v.width:layout.width))+'px + max(8px,env(safe-area-inset-right)))';
     cancel.style.left='calc('+(v?v.offsetLeft:0)+'px + max(8px,env(safe-area-inset-left)))';
-    cancel.style.setProperty('--mobile-bottom-offset',Math.max(0,innerHeight-(v?v.offsetTop+v.height:innerHeight))+'px');
+    cancel.style.setProperty('--mobile-bottom-offset',Math.max(0,layout.height-(v?v.offsetTop+v.height:layout.height))+'px');
     rail.style.maxHeight='calc('+Math.max(0,(v?v.height:innerHeight)-header)+'px - max(8px,env(safe-area-inset-top)) - max(8px,env(safe-area-inset-bottom)))';
   }
   if(window.visualViewport){visualViewport.addEventListener('resize',syncVisibleArea);visualViewport.addEventListener('scroll',syncVisibleArea);}
-  addEventListener('simgolf-header-resize',syncVisibleArea);addEventListener('resize',syncVisibleArea);addEventListener('pageshow',syncVisibleArea);syncVisibleArea();
+  addEventListener('simgolf-screen-resize',syncVisibleArea);addEventListener('simgolf-header-resize',syncVisibleArea);addEventListener('resize',syncVisibleArea);addEventListener('pageshow',syncVisibleArea);syncVisibleArea();
   setInterval(function(){
     s=Module.mobileState||{};
     var waitingModal=pendingSection!==null?modalSection():null;
@@ -525,7 +529,11 @@
     zoomValue.textContent=(Module.mapPresentation.zoom.toFixed(2))+'×'+(Module.mapZoomNotice?.until>Date.now()?' · '+Module.mapZoomNotice.text:'');
     if(pendingHole&&s.course){if(s.openHoles>pendingHole.count||s.hole!==pendingHole.hole){building=false;buildPage='';open=false;page='';pendingHole=null;render();}else if(performance.now()-pendingHole.time>1200&&Module.menuResult?.kind===0&&Module.menuResult.item===104){pendingHole=null;}}
     syncControls();
-    messageText.data=s.message||'';
+    var text=s.message||'';
+    // Welcome copy contains the original fixed-width soft line breaks. Reflow
+    // that prose only; retain structured breaks in other original messages.
+    if(/^Welcome to\s/i.test(text))text=text.replace(/\s+/g,' ').trim();
+    if(messageText.data!==text){messageText.data=text;message.scrollTop=0;}
     if(s.fundsCheck&&s.message){if(!message.contains(acknowledge))message.appendChild(acknowledge);}else if(message.contains(acknowledge))acknowledge.remove();
     message.hidden=!s.message||open||!Module.mobileUI;
     var tool=(s.terrain||[]).find(function(t){return t.id===s.tool;});
@@ -769,7 +777,7 @@
   ['mousedown','mousemove','mouseup','click','pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','wheel','keydown','keyup','keypress','beforeinput','input','compositionstart','compositionupdate','compositionend'].forEach(t=>root.addEventListener(t,e=>e.stopPropagation()));
   ['mousedown','mouseup','click','pointerdown','pointerup','touchstart','touchend'].forEach(t=>back.addEventListener(t,e=>e.stopPropagation()));
   root.addEventListener('pointerdown',e=>pointers.add(e.pointerId),true);['pointerup','pointercancel'].forEach(t=>addEventListener(t,e=>pointers.delete(e.pointerId),true));addEventListener('blur',()=>pointers.clear());
-  function bounds(){var v=visualViewport,header=document.getElementById('build-header').getBoundingClientRect().height;root.style.top=((v?v.offsetTop:0)+header)+'px';root.style.left=(v?v.offsetLeft:0)+'px';root.style.width=(v?v.width:innerWidth)+'px';root.style.height=Math.max(0,(v?v.height:innerHeight)-header)+'px';}
+  function bounds(){var b=Module.getScreenBounds(),top=Math.max(b.top,document.getElementById('build-header').getBoundingClientRect().bottom);root.style.top=top+'px';root.style.left=b.left+'px';root.style.width=b.width+'px';root.style.height=Math.max(0,b.top+b.height-top)+'px';}
   function showPreview(s){
     var p=s.preview,key=JSON.stringify([s.selected,p]);if(key===previewStamp)return;previewStamp=key;preview.replaceChildren();
     if(!p){preview.appendChild(text('p','Select a save to see its course and hole details.'));return;}
@@ -911,4 +919,15 @@
     comparison(m);content.scrollTop=scroll;
   }
   setInterval(refresh,150);addEventListener('resize',refresh);addEventListener('simgolf-header-resize',refresh);
+})();
+
+// Full-screen mobile panels use the same visible horizontal bounds as the HUD.
+(function(){
+  if(!Module.mobileUI)return;
+  var style=document.createElement('style');style.textContent=`
+    #mobile-profile,#mobile-staff,#mobile-match{left:var(--screen-left,0px);right:auto;width:var(--screen-width,100%);bottom:var(--screen-bottom-gap,0px);padding-top:10px}
+    #mobile-profile-return,#mobile-staff-return{right:calc(var(--screen-right-gap,0px) + max(8px,env(safe-area-inset-right)))}
+    body.mobile-rail-visible #mobile-profile-return,body.mobile-rail-visible #mobile-staff-return,body.mobile-rail-visible #mobile-load-return{right:calc(var(--screen-right-gap,0px) + var(--mobile-rail-space))}
+    #mobile-load-return{left:calc(var(--screen-left,0px) + max(8px,env(safe-area-inset-left)));bottom:calc(var(--screen-bottom-gap,0px) + max(8px,env(safe-area-inset-bottom)))}
+  `;document.head.appendChild(style);
 })();
