@@ -1,14 +1,14 @@
 {
   "repository": "fourtempers-code/sgmobile-alpha",
   "prospective_url": "https://fourtempers-code.github.io/sgmobile-alpha/",
-  "build": "alpha120-release-v1-20261030T014221Z",
+  "build": "alpha130-release-v1-20261103T131953Z",
   "site_files": 51,
-  "bytes": 24899613,
+  "bytes": 25126823,
   "public_repository_proposed": true,
   "publishing_performed": false,
   "approval_required": false,
   "manual_deployment_only": true,
   "private_development_repository_unchanged": true,
-  "authorization": "Maintainer explicitly requests latest tested build on GitHub as version1.2",
-  "existing_public_repository": true
+  "authorization": "Maintainer explicitly requests publishing the current tested game state to the public build before starting version 2.0 development.",
+  "release_version": "alpha1.3.0"
 }

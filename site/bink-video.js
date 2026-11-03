@@ -14,7 +14,7 @@
   const root=document.createElement('section'),canvas=document.createElement('canvas'),skip=document.createElement('button');root.id='opening-video';root.setAttribute('aria-label','Original SimGolf opening movie');
   root.style.cssText='position:fixed;inset:0;z-index:995;background:#000;display:grid;place-items:center;touch-action:none';
   canvas.style.cssText='width:min(100%,calc(100dvh * 4 / 3));height:auto;max-height:100%;object-fit:contain;aspect-ratio:4/3';
-  skip.textContent='Skip intro';skip.style.cssText='position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));min-width:100px;min-height:48px;border:1px solid #9eafa2;border-radius:6px;background:#142219dd;color:white;font:16px system-ui';root.append(canvas,skip);document.body.append(root);
+  skip.textContent='Skip intro';skip.style.cssText='position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));min-width:100px;min-height:48px;border:1px solid var(--menu-border);border-radius:6px;background:var(--menu-overlay);color:var(--menu-text);font:16px system-ui';root.append(canvas,skip);document.body.append(root);
   const state=Module.binkVideo={phase:'loading',frames:0,audioSamples:0};Module.binkVideoActive=true;
   let readyResolve,doneResolve,done=false,meta,clockStart=0,clockWall=0,raf=0,end=null,queue=[],sources=[],timeout;
   const ready=new Promise(r=>readyResolve=r),finished=new Promise(r=>doneResolve=r);let worker;
@@ -47,7 +47,7 @@
    else if(m.type==='audio'){
     state.audioSamples+=m.frames;if(!audioClock)return;
     const buffer=ctx.createBuffer(meta.channels,m.frames,meta.rate),pcm=new Float32Array(m.data);for(let c=0;c<meta.channels;c++)buffer.copyToChannel(pcm.subarray(c*m.frames,(c+1)*m.frames),c);
-    const source=ctx.createBufferSource();source.buffer=buffer;source.connect(ctx.destination);sources.push(source);source.onended=()=>{source.disconnect();sources=sources.filter(v=>v!==source);};source.start(Math.max(ctx.currentTime,clockStart+m.pts));
+    const source=ctx.createBufferSource();source.buffer=buffer;source.connect(Module.getAudioOutput?Module.getAudioOutput(ctx):ctx.destination);sources.push(source);source.onended=()=>{source.disconnect();sources=sources.filter(v=>v!==source);};source.start(Math.max(ctx.currentTime,clockStart+m.pts));
    }else if(m.type==='end')end=m.duration;else if(m.type==='error')finish('error',m.message);
   };
   const data=new Uint8Array(bytes);worker.postMessage({type:'open',data:data.buffer},[data.buffer]);

@@ -1,27 +1,11 @@
-# SimGolf Mobile — Alpha version 1.2
+# SGMobile Alpha 1.3
 
-[Play SimGolf Mobile](https://fourtempers-code.github.io/sgmobile-alpha/golf.html?hd=0&mobile=1)
+[Play SGMobile](https://fourtempers-code.github.io/sgmobile-alpha/) · [Release notes](https://github.com/fourtempers-code/sgmobile-alpha/releases/tag/alpha1.3.0)
 
-Build: **alpha120-release-v1-20261030T014221Z**.
+This artifact-only repository hosts the public SGMobile app. Current version: **Alpha 1.3.0**. It packages the tested private 1.2.24 functionality before the next 2.0 development phase.
 
-An unofficial mobile-focused adaptation of the original SimGolf engine. Players supply their own compatible game files locally. Original assets, executables and saves are not distributed. [Setup and testing](site/README.txt) · [Third-party notices](site/THIRD_PARTY_NOTICES.txt).
+Players supply their own matching original SimGolf files locally. Original assets, executables, DLLs, mapped module images, user saves and private development logs are excluded. See [setup and supported inputs](site/README.txt) and [third-party notices](site/THIRD_PARTY_NOTICES.txt).
 
-## Changes in Alpha1.2
+Existing public installations keep the same URL and Home Screen identity. Use Check for updates, then close and reopen when prompted. Keep save backups; do not clear browser data to update.
 
-- Expanded views and improved controls/messages across larger, unfolded, portrait and landscape screens.
-- Two-finger drag panning alongside pinch zoom, preserving selected construction tools.
-- Smoother map panning, fixes for rubberbanding, release snapping and landscape display stalls.
-- Responsive pinch/wheel zoom, clearer detail below1× and stable images when a pinch ends.
-- Check for updates on the welcome/title menus and Copy diagnostics for bug reports.
-
-The maintainer accepts the latest private map navigation. This release promotes that runtime with updated labels/instructions. Original gameplay speed and save format remain unchanged.30FPS character animation is a separate next investigation and is not included.
-
-## Updating and testing
-
-Export a save backup, save, close all game tabs/Home Screen windows, then reopen online and verify **Alpha version1.2** plus the exact build. Use **Check for updates** if needed. Do not clear website data. Compatible originals/saves should remain installed.
-
-Continue a save; test one/two-finger pan, pinch release below/above1×, rotation/folded layouts, construction and a round. Save, fully close and reopen offline, then load/save. Report exact build, device/browser, orientation, course/date and expected/actual behavior in Discord. Copy diagnostics is available from the version label.
-
-Use one game window at a time: simultaneous clients can overwrite save inventories. Other devices, long sessions, storage eviction and progression remain alpha test areas.
-
-This repository contains reviewed app artifacts and public dependency source archives. Development remains private. Publication is manual, verifies every staged file hash and uploads only `site/`.
+Deployment is manual from main, verifies every site-file hash and uploads only site/. Private source development is separate. This remains alpha software; desktop engineering tests do not replace physical-phone acceptance.

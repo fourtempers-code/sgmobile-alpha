@@ -71,7 +71,7 @@ var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIR
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/tmp3ikbwiry.js
+// include: /tmp/tmp3x_gwl7c.js
 
   if (!Module['expectedDataFileDownloads']) Module['expectedDataFileDownloads'] = 0;
   Module['expectedDataFileDownloads']++;
@@ -204,21 +204,21 @@ Module['FS_createPath']("/", "fonts", true, true);
 
   })();
 
-// end include: /tmp/tmp3ikbwiry.js
-// include: /tmp/tmp65nkieeq.js
+// end include: /tmp/tmp3x_gwl7c.js
+// include: /tmp/tmpardtd_ln.js
 
     // All the pre-js content up to here must remain later on, we need to run
     // it.
     if ((typeof ENVIRONMENT_IS_WASM_WORKER != 'undefined' && ENVIRONMENT_IS_WASM_WORKER) || (typeof ENVIRONMENT_IS_PTHREAD != 'undefined' && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != 'undefined' && ENVIRONMENT_IS_AUDIO_WORKLET)) Module['preRun'] = [];
     var necessaryPreJSTasks = Module['preRun'].slice();
-  // end include: /tmp/tmp65nkieeq.js
-// include: /tmp/tmpgm06r21s.js
+  // end include: /tmp/tmpardtd_ln.js
+// include: /tmp/tmpky3zncpq.js
 
     if (!Module['preRun']) throw 'Module.preRun should exist because file support used it; did a pre-js delete it?';
     necessaryPreJSTasks.forEach((task) => {
       if (Module['preRun'].indexOf(task) < 0) throw 'All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?';
     });
-  // end include: /tmp/tmpgm06r21s.js
+  // end include: /tmp/tmpky3zncpq.js
 
 
 var programArgs = [];
@@ -9639,6 +9639,8 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
   STREAM_BYTES:131072,
   ctx:null,
   master:null,
+  menuMusic:null,
+  menuTimer:null,
   sounds:{
   },
   decode(ab) {
@@ -9691,12 +9693,51 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
             const pending = s.pending;
             s.pending = [];
             for (const args of pending) SND.start(s, ...args);
+            SND.syncMenuMusic();
           })
           .catch((e) => {
             s.state = 'failed';
             s.pending = [];
             err('sound: ' + s.url + ': ' + e.message);
           });
+      },
+  movieActive() { return !!Module.binkVideoActive || !!document.querySelector('video'); },
+  courseVisible() {
+        return !!Module.mapCourseReady && !!Module.mapPresentation?.course && !Module.atTitle &&
+          !Module.uiPresentation && !Module.loadState?.active && !Module.courseLoading?.active &&
+          !Module.initialLoading?.active && document.getElementById('map-display')?.hidden === false;
+      },
+  fade(s, ms) {
+        s.pending = [];
+        const now = SND.ctx.currentTime, end = now + Math.max(ms, 1) / 1000;
+        for (const v of s.voices) {
+          v.stopping = true;
+          const g = v.gain.gain;
+          g.cancelScheduledValues(now);
+          g.setValueAtTime(g.value, now);
+          g.linearRampToValueAtTime(0, end);
+          v.src.stop(end);
+        }
+      },
+  syncMenuMusic() {
+        const m = SND.menuMusic;
+        if (!m || !SND.ctx) return;
+        if (SND.courseVisible()) {
+          SND.menuMusic = null;
+          clearInterval(SND.menuTimer); SND.menuTimer = null;
+          SND.fade(m.sound, 1000);
+          Module.menuMusic = {phase:'course', index:128};
+          return;
+        }
+        const movie = SND.movieActive();
+        if (movie) {
+          for (const v of m.sound.voices.slice()) {
+            if (!v.stopping) { v.stopping = true; v.src.stop(); }
+          }
+        } else if (m.sound.state === 'ready' && !m.sound.voices.some(v => !v.stopping)) {
+          SND.start(m.sound, ...m.args);
+        }
+        Module.menuMusic = {phase:movie?'intro':m.sound.state==='failed'?'unavailable':'menus', index:128};
       },
   start(s, volume, pan, cents, delayMs) {
         const ctx = SND.ctx;
@@ -9713,10 +9754,11 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
         const src = ctx.createBufferSource();
         src.buffer = s.buffer;
         src.playbackRate.value = Math.pow(2, cents / 1200);
-        if (s.loop) {
+        const menu = SND.menuMusic?.sound === s;
+        if (s.loop || menu) {
           src.loop = true;
-          src.loopStart = s.loopStart;
-          src.loopEnd = s.loopEnd;
+          src.loopStart = s.loop ? s.loopStart : 0;
+          src.loopEnd = s.loop ? s.loopEnd : s.buffer.duration;
         }
         const gain = ctx.createGain();
         gain.gain.value = (Math.max(0, Math.min(127, volume)) + 1) / 128;
@@ -9778,16 +9820,10 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
   function _snd_js_fade_out(index, ms) {
       const s = SND.sounds[index];
       if (!SND.ctx || !s) return;
-      s.pending = [];
-      const now = SND.ctx.currentTime, end = now + Math.max(ms, 1) / 1000;
-      for (const v of s.voices) {
-        v.stopping=true;
-        const g = v.gain.gain;
-        g.cancelScheduledValues(now);
-        g.setValueAtTime(g.value, now);
-        g.linearRampToValueAtTime(0, end);
-        v.src.stop(end);
-      }
+      // Original startup fades before the location chooser/loaded-map handoff.
+      // Retain that fade until the mobile loading screen has really released.
+      if (SND.menuMusic?.sound === s) { SND.syncMenuMusic(); return; }
+      SND.fade(s, ms);
     }
 
   function _snd_js_init() {
@@ -9798,7 +9834,7 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
       SND.master = SND.ctx.createGain();
       SND.introGate = SND.ctx.createGain();
       SND.introGate.gain.value = Module.binkVideoActive ? 0 : 1;
-      SND.master.connect(SND.introGate); SND.introGate.connect(SND.ctx.destination);
+      SND.master.connect(SND.introGate); SND.introGate.connect(Module.getAudioOutput ? Module.getAudioOutput(SND.ctx) : SND.ctx.destination);
       for (const ev of ['pointerdown', 'pointerup', 'keydown', 'touchstart', 'touchend', 'click']) addEventListener(ev, SND.unlock, true);
       Module['soundDebug'] = SND;   // for the console and tests
     }
@@ -9806,6 +9842,12 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
   function _snd_js_play(index, volume, pan, cents, delayMs) {
       const s = SND.sounds[index];
       if (!SND.ctx || !s || s.state === 'failed') return;
+      if (index === 128 && Module.localFiles && Module.mobileUI &&
+          (SND.menuMusic || (Module.atTitle || (!Module.mapCourseReady && !Module.mobileState?.wasCourse)))) {
+        SND.menuMusic = {sound:s, args:[volume, pan, cents, delayMs]};
+        if (!SND.menuTimer) SND.menuTimer = setInterval(SND.syncMenuMusic, 100);
+        SND.load(s); SND.syncMenuMusic(); return;
+      }
       if (s.state === 'ready') { SND.start(s, volume, pan, cents, delayMs); return; }
       if (s.pending.length < SND.MAX_VOICES) s.pending.push([volume, pan, cents, delayMs]);
       SND.load(s);
@@ -9821,6 +9863,8 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
   function _snd_js_shutdown() {
       if (!SND.ctx) return;
       for (const ev of ['pointerdown', 'pointerup', 'keydown', 'touchstart', 'touchend', 'click']) removeEventListener(ev, SND.unlock, true);
+      clearInterval(SND.menuTimer); SND.menuTimer = null; SND.menuMusic = null;
+      Module.menuMusic = null;
       SND.ctx.close();
       SND.ctx = SND.master = null;
       SND.sounds = {};
@@ -10436,129 +10480,209 @@ function checkIncomingModuleAPI() {
   ignoredModuleProp('onSbrkGrow');
 }
 var ASM_CONSTS = {
-  285334028: () => { return Module.quiet ? 1 : 0; },  
- 285334061: () => { console.log(new Error().stack); },  
- 285334097: ($0, $1) => { const w = $0; const h = $1; if (typeof Module.fitCanvas === 'function') Module.fitCanvas(w, h); else { Module.canvas.style.width = 'min(100vw, calc(100vh * ' + w + ' / ' + h + '))'; Module.canvas.style.aspectRatio = w + ' / ' + h; } },  
- 285334334: ($0, $1, $2, $3, $4) => { if (Module.fitCanvas) Module.fitCanvas($0, $1); var buffers = {}; buffers.width=$0; buffers.height=$1; buffers.screen=$2; buffers.oldRendererViewport=Array.from(HEAP32.subarray($3>>2,($3>>2)+4)); buffers.rendererViewport=Array.from(HEAP32.subarray($4>>2,($4>>2)+4)); Module.viewportBuffers=buffers; },  
- 285334637: ($0, $1, $2, $3, $4, $5, $6, $7, $8) => { Module.eraseState=({phase:$0,queued:$1,presses:$2,tile:[$3,$4],serial:$5,reason:UTF8ToString($6),seen:$7,confirm:$8}); },  
- 285334758: () => { return Module.mapMode===2; },  
- 285334787: () => { Module.loadDeleteConfirm=true; },  
- 285334820: () => { Module.loadDeleteConfirm=false; },  
- 285334854: () => { return !!Module.mobileUI; },  
- 285334882: () => { Module.loadQueue=[];Module.loadState=null; },  
- 285334927: () => { Module.loadQueue=[];Module.loadState=null; },  
- 285334972: ($0, $1, $2, $3, $4, $5, $6) => { var rows=[]; for(var i=0;i<Math.min($0,100);i++){ var name=Module.readGameText(0x80b130+i*100,100); rows.push({index:i,name:name,modified:Module.gameFileModified?.('Saved Games/'+name)||null}); } var preview=null; if($1>=0&&$1<$0){ var index=HEAP32[0x59bf90>>2];var type=index>=0&&index<16?HEAP8[0x571ff4+index*46]:-1; var template=0x4c1ea8+type*130;var custom=HEAP16[0x59d81c>>1];var emblem=type>=0&&type<16?HEAPU8[template]:-1; preview=({name:type>=0&&type<16?Module.readGameText(custom>=0&&custom<0x2324?0x56fcb0+custom:template+1,129):'',designer:Module.readGameText(0x4d6098,16),theme:Module.readGameText(0x567328,128),holes:[],par:HEAP32[0x59aafc>>2],yards:HEAP32[0x58d36c>>2],cash:HEAP32[0x571fd4>>2]*100,fun:HEAP32[0x59ae78>>2],length:HEAP32[0x5a882c>>2]/100,accuracy:HEAP32[0x56949c>>2]/100,imagination:HEAP32[0x5a636c>>2]/100,art:emblem>=0&&emblem<16?0x541710+emblem*44:0,mask:emblem>=0&&emblem<16?0x5791f8+emblem*44:0}); for(var h=1;h<Math.min(HEAP32[0x5685f0>>2],19);h++){var a=0x575ab0+h*520;preview.holes.push({hole:h,par:HEAPU8[a],yards:HEAP16[(a+4)>>1]});} } Module.loadState=({serial:$3,rows:rows,total:$0,selected:$1,offset:$2,preview:preview,fallback:!!$4,busy:!!$5||$6>=0,active:true}); },  
- 285336183: () => { if(Module.loadState)Module.loadState.suspended=true; },  
- 285336238: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) => { if(Module.loadState)Module.loadState.suspended=false;if(Module.loadTrace)Module.loadInput=([$0,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11]); },  
- 285336373: ($0) => { var q=Module.loadQueue;if(!q?.length)return 0;var c=q.shift();for(var i=0;i<3;i++)HEAP32[($0>>2)+i]=c[i];HEAP32[($0>>2)+3]=c[1]!==4||(c[2]>=0&&c[2]<100&&c[3]===Module.readGameText(0x80b130+c[2]*100,100));return 1; },  
- 285336589: () => { Module.loadQueue=[]; },  
- 285336612: ($0) => { Module.loadDeleteName=Module.readGameText($0,100); },  
- 285336665: () => { Module.lotPreview=null;Module.lotPending=false; },  
- 285336715: () => { return !!Module.lotMode; },  
- 285336742: () => { return !!Module.lotEdgeActive?.(); },  
- 285336779: () => { Module.lotPreview=null; },  
- 285336805: () => { Module.lotPending=true; },  
- 285336831: () => { Module.lotPending=false; },  
- 285336858: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9) => { Module.lotPreview=({kind:$0,variant:$1,serial:$2,point:[$3,$4],tile:[$5,$6],valid:!!$7,price:$8,reason:UTF8ToString($9)}); },  
- 285336983: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10) => { Module.lotPreview=({kind:4,variant:$10,serial:$0,point:[$1,$2],tile:[$3,$4],valid:!!$5,price:$6,radius:$7,free:!!$8,reason:$9?'Choose an empty site':''}); },  
- 285337140: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9) => { Module.lotPreview=({kind:5,serial:$0,point:[$1,$2],tile:[$3,$4],valid:!!$5,value:$6,preparation:$7,profit:$6-$7,lots:$8,reason:$9?'Choose an empty site':$5?'':'Location not attractive enough'}); },  
- 285337337: () => { return !!Module.lotMode; },  
- 285337364: () => { Module.lotPreview=null;Module.lotPending=false; },  
- 285337414: () => { Module.lotPending=false; },  
- 285337441: ($0, $1, $2, $3) => { Module.lotProfitLabel=({x:$0,y:$1,profit:$2,text:UTF8ToString($3),color:$2>0?"green":"red"}); },  
- 285337537: () => { Module.photoRenderSerial=(Module.photoRenderSerial||0)+1; },  
- 285337597: () => { return !!Module.mobileState?.wasCourse; },  
- 285337639: ($0) => { var n={};n.text=Module.readGameText(0x51a068);n.time=performance.now();n.blocking=!!Module.fundsCheck;n.photoSerial=$0?(Module.photoRenderSerial||0):0;Module.mobileNotification=n;var owner=HEAP32[0x4c2e0c>>2];if(owner!==-1)owner&=255;if(owner!==-1&&HEAP32[0x4c2e08>>2]===owner&&n.text){if(!Module.snapshotPhotoCaption||Module.snapshotPhotoCaption.owner!==owner)Module.snapshotPhotoCaption=({owner:owner,text:n.text});if(Module.snapshotPhotoCaption.text===n.text)n.snapshotOwner=owner;} },  
- 285338127: ($0) => { Module.tournamentDraft=$0?({headings:[],rows:[]}):null;if(!$0)Module.tournamentBoard=null; },  
- 285338220: ($0, $1) => { var d=Module.tournamentDraft;if(d)d[$1?'rows':'headings'].push(Module.readGameText($0)); },  
- 285338311: () => { Module.tournamentBoard=Module.tournamentDraft;Module.tournamentDraft=null; },  
- 285338388: ($0) => { var q=Module.gameTextQueue; if(q&&q.length){if($0)q.push($0);var c=q.shift();Module.mobileTextPending=q.length;return c;} return $0; },  
- 285338525: () => { return !!Module.gameTextQueue?.length; },  
- 285338566: () => { if(Module.gameTextQueue)Module.gameTextQueue.length=0;if(Module.mobileState)Module.mobileState.textInput=true; },  
- 285338679: () => { if(Module.mobileState)Module.mobileState.textInput=false;if(Module.gameTextQueue)Module.gameTextQueue.length=0;Module.mobileTextPending=0; },  
- 285338820: ($0) => { var q=Module.menuQueue;if(!q||!q.length)return 0;var c=q.shift();HEAP32[$0>>2]=c[0];HEAP32[($0>>2)+1]=c[1];return 1; },  
- 285338939: ($0) => { return Module.mapPresentation?.pendingNative===$0; },  
- 285338992: ($0) => { if(Module.mapPresentation?.pendingNative===$0)Module.menuQueue.push([11,$0]); },  
- 285339072: ($0) => { var v=Module.mapPresentation;if(v){v.nativeAck=$0;v.nativeAckSerial=v.serial;if(Module.mobileState)Module.mobileState.zoom=$0;} },  
- 285339202: ($0, $1, $2) => { Module.menuResult={};Module.menuResult.kind=$0;Module.menuResult.item=$1;Module.menuResult.status=$2; },  
- 285339306: () => { Module.mapCourseReady=false; },  
- 285339337: () => { Module.staffPortraitsSuppressed=(Module.staffPortraitsSuppressed||0)+1; },  
- 285339411: ($0) => { var a=Array.from(HEAP32.subarray($0>>2,($0>>2)+17));var p={};p.serial=a[0];p.expected=a.slice(1,3);p.actual=a.slice(3,5);p.view=a.slice(5,11);p.expectedView=a.slice(11,17);Module.aimPreviewProbe=p; },  
- 285339611: ($0, $1, $2, $3, $4) => { var n={};n.serial=$0;n.point=([$1,$2]);n.tile=([$3,$4]);Module.aimAck=n; },  
- 285339686: ($0, $1) => { var n=Module.roundHUD;if(!n||$1===0)n=Module.roundHUD={lines:[]};n.lines[$1]=Module.readGameText($0);n.time=performance.now(); },  
- 285339815: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10) => { Module.onMapPresent?.({valid:!!$0&&!!Module.mapCourseReady&&!Module.atTitle,x:$1,y:$2,rotation:$3,zoom:$4,width:$5,height:$6,rgba:$7,requestedX:$8,requestedY:$9,logicalZoom:$10});return $0&&$7&&Module.panVisual?.atomic?1:0; },  
- 285340041: () => { return !document.hidden&&!!Module.panVisual?.drag?.accepted; },  
- 285340104: () => { Module.renderSliceCount=(Module.renderSliceCount||0)+1; },  
- 285340162: ($0, $1, $2) => { Module.finishSmoothPan?.($0,$1,$2); },  
- 285340200: ($0) => { var s=Module.panVisual;if(s&&(!$0||s.serial===$0))s.nativeOwned=false;if(Module.smoothPanRequest?.serial===$0)Module.smoothPanRequest=null; },  
- 285340342: () => { Module.shotPending=false;Module.aimAck=null; },  
- 285340389: ($0, $1) => { Module.proIntroSerial=(Module.proIntroSerial||0)+1;Module.proIntro=({serial:Module.proIntroSerial,golfer:$0,opponent:$1}); },  
- 285340514: () => { Module.proIntro=null; },  
- 285340538: () => { var note=Module.mobileNotification;Module.photoCaptionStack=Module.photoCaptionStack||[];Module.photoCaptionStack.push(Module.mobilePhotoCaption||null);Module.mobilePhotoCaption=note?.photoSerial===Module.photoRenderSerial?note:null;Module.setAimMode(false);if(Module.mobileState){Module.mobileState.photoActive=true;Module.mobileState.photoWait=true;Module.mobileState.shotReady=false;} },  
- 285340928: ($0) => { Module.mobilePhotoCaption=Module.photoCaptionStack?.pop()||null;Module.cancelMapGesture();if(Module.mobileState){Module.mobileState.photoWait=!!$0;Module.mobileState.photoActive=!!$0||HEAP32[0x4c2e0c>>2]!==-1;} },  
- 285341141: () => { return !!Module.mobileUI; },  
- 285341169: ($0) => { Module.turnSerial=$0;Module.roundHUD=null; },  
- 285341214: ($0, $1, $2, $3, $4, $5) => { var s=Module.mobileState||{};s.course=!!$0&&!!Module.mapCourseReady;s.textInput=!!$2;s.wasCourse=s.wasCourse||s.course;s.hidden=!!$1; s.tool=HEAP32[0x4c2848>>2];s.object=HEAP32[0x4c2854>>2];s.tab=HEAP32[0x567afc>>2]; s.constructing=s.tool>=0||s.object>=0||!!(HEAP32[0x59e7b8>>2]&2); s.elevation=s.tab===1&&!!HEAP32[0x55e928>>2]&&!!(HEAP32[0x59e7b8>>2]&2);s.terrainShape=HEAP32[0x542f20>>2]; s.zoom=HEAP32[0x4c2844>>2];s.rotation=HEAP32[0x5685f4>>2];s.paused=!!(HEAP32[0x59e7b8>>2]&4);s.cash=HEAP32[0x571fd4>>2]*100; var note=Module.mobileNotification; var owner=HEAP32[0x4c2e0c>>2];var photo=!!$5||owner!==-1; if(owner!==-1)owner&=255; if(owner===-1)Module.snapshotPhotoCaption=null; if(owner!==-1&&(!Module.snapshotPhotoCaption||Module.snapshotPhotoCaption.owner!==owner)&&HEAPU8[0x569498]&&HEAP32[0x4c2e08>>2]===owner){var originalText=Module.readGameText(0x5a6d40);if(originalText)Module.snapshotPhotoCaption=({owner:owner,text:originalText});} var caption=$5?Module.mobilePhotoCaption:(Module.snapshotPhotoCaption?.owner===owner?Module.snapshotPhotoCaption:null); s.message=photo?(caption?.text||''):(note&&!note.photoSerial&&note.snapshotOwner===undefined&&(performance.now()-note.time<650||(note.blocking&&Module.fundsCheck))?note.text:''); s.fundsCheck=!!Module.fundsCheck; s.funRating=HEAP32[0x59ae78>>2];s.skillRating=HEAP32[0x541cd8>>2]; s.tournamentActive=!!(HEAPU32[0x59e7b8>>2]&0x200000); if(!s.tournamentActive){Module.tournamentBoard=null;Module.tournamentDraft=null;} s.roundGolfer=HEAP32[0x5a59f8>>2];s.roundActive=s.roundGolfer>=0&&s.roundGolfer<=152;s.shotMask=$3;s.shot=HEAP32[0x58f330>>2];s.shotTurn=s.roundActive&&s.tab===3&&!!$3;s.photoWait=!!$5;s.photoActive=s.photoWait||HEAP32[0x4c2e0c>>2]!==-1;s.shotReady=s.shotTurn&&!s.photoActive&&HEAP32[0x5a34e4>>2]<1;s.turnSerial=Module.turnSerial||0; s.scorecard=[]; if(s.roundActive){ var ids=[s.roundGolfer];var partner=HEAP16[(0x57955a+s.roundGolfer*256)>>1]; if(partner>=0&&partner<=152&&partner!==s.roundGolfer&&HEAP8[0x5794d9+partner*256]>0)ids.push(partner); for(var id of ids){ var profile=HEAP16[(0x57956e+id*256)>>1]; if(profile<0||profile>=512)continue; var card=({id:id,name:Module.readGameText(0x4d6098+profile*560,560),hole:HEAP8[0x5794d9+id*256],current:HEAP8[0x5794da+id*256],holes:[]}); for(var h=1;h<=18;h++){var par=HEAPU8[0x575ab0+h*520];if(par)card.holes.push({hole:h,par:par,score:HEAP8[0x5794db+id*256+h]});} s.scorecard.push(card); } } s.availableLots=HEAP32[0x56d1b0>>2]; s.hole=HEAP32[0x5685f0>>2]; var h=0x575ab0+s.hole*520; s.canOpenHole=s.hole>=1&&s.hole<=18&&HEAPU8[h]===0&&HEAP32[(h+8)>>2]!==0&&HEAP32[(h+24)>>2]!==0&&(!(HEAP32[0x59e7b8>>2]&64)||HEAP32[(h+16)>>2]!==0)&&s.tab!==3; s.openHoles=0;for(var h=1;h<=18;h++)if(HEAPU8[0x575ab0+h*0x208])s.openHoles++; if(s.course){ s.terrain=[];for(var i=0;i<16;i++){var id=HEAPU8[0x4c79a0+i];var name=Module.readGameText(0x578350+id*48,48);if(name)s.terrain.push({id:id,name:name,art:0x570cb8+i*176});} var counts=({1:5,4:14,2:15,16:7,19:8}); s.variation=s.tab===0&&HEAP32[0x55e924>>2]&&counts[s.object]?({count:counts[s.object],selected:HEAP32[0x5a9f60>>2],mask:s.object===4?HEAPU32[0x543cfc>>2]:0}):null; var landmarkNames=([0x4c4c3c,0x4c4c20,0x4c4bec,0x4c4bc4,0x4c4ba0,0x4c4b80,0x4c4b4c,0x4c4b20,0x4c4b04,0x4c4ae8,0x4c4ad4,0x4c4aa0,0x4c4a84,0x4c4a50]); s.landmarks=landmarkNames.map(function(p,i){return ({id:i,name:Module.readGameText(p,64),unlocked:!!(HEAPU32[0x543cfc>>2]&(1<<i)),free:!!(HEAPU32[0x822c70>>2]&(1<<i)),price:(HEAPU32[0x822c70>>2]&(1<<i))?0:((i*5+25)*200)/100*100,radius:Math.trunc((i*5+40)*5/4),group:i&3});}); s.buildings=[];s.buildingDetails=[];for(var i=0;i<9;i++){ var kind=i+6;var level=HEAP32[(0x5a8c38+kind*4)>>2];var base=HEAP16[(0x4c26c2+kind*20)>>1];var name=Module.readGameText(0x4c2728+i*20,16); s.buildings.push(name);s.buildingDetails.push({id:i,kind:kind,name:name,level:level,price:Math.trunc(base*(level+2)/2)*100,side:HEAP8[0x4c26c0+kind*20]+level,unlocked:kind<HEAP32[0x5a6364>>2]&&level<2}); } s.employees=[];s.staff=[]; for(var i=0;i<Math.min(8,HEAP32[0x5aa6c0>>2]);i++){ var id=HEAP32[(0x5aa5b8>>2)+i];if(id<0||id>=64)continue; var base=0x585850+id*76;var flags=HEAPU8[base+18];var type=HEAP8[base+19];var role=((flags&8)>>3)-(type*2+4); if(!flags||role<0||role>=8)continue; var name=Module.readGameText(base+42,32)||Module.readGameText(HEAPU32[(0x4c148c>>2)+role],64).trim(); s.employees.push(name);s.staff.push({id:id,item:i+8,name:name,roleIndex:role,role:Module.readGameText(HEAPU32[(0x4c1464>>2)+role],64),weekly:HEAPU8[0x4c2e2c+role]*100,hired:HEAP16[(base+34)>>1],activity:HEAP16[(base+36)>>1]}); } s.staffOffset=HEAP32[0x5aa558>>2];s.staffTotal=HEAP32[0x5aa6c0>>2]+s.staffOffset; s.staffOpen=!!HEAP32[0x561254>>2];s.employeeSelected=HEAP32[0x4c7aec>>2]; s.staffRound=!!$4;s.movingWorker=HEAP32[0x4c2e10>>2]>=0&&HEAP32[0x4c2e10>>2]<64; s.golfers=[];if(s.tab===2)for(var i=0;i<16;i++){var id=HEAP32[(0x5a9cf0>>2)+i];if(id>=0&&id<152){var profile=HEAP16[(0x57946e+id*256)>>1];if(profile>=0&&profile<512)s.golfers.push({item:i,name:Module.readGameText(0x4d6098+profile*560,560)});}} } Module.mobileState=s; },  
- 285346313: ($0) => { var q=Module.touchQueue; if(!q)return 0; var n=Math.min(q.length,64); var p=$0>>2; for(var i=0;i<n;i++)for(var j=0;j<13;j++)HEAP32[p+i*13+j]=q[i][j]??0; q.splice(0,n);return n; },  
- 285346494: () => { Module.mapInputDiscard='changed-frame-geometry'; },  
- 285346545: () => { Module.mapInputDiscard='pointer-left-rendered-frame'; },  
- 285346601: ($0, $1, $2, $3, $4) => { Module.lastMapInputFrame=({type:$0,offset:[$1,$2],point:[$3,$4]}); },  
- 285346670: () => { return Module.aimEdgeActive()?1:0; },  
- 285346707: () => { Module.aimAck=null; },  
- 285346729: ($0, $1, $2, $3, $4) => { var p={};p.type=$0;p.serial=$1;p.point=([$2,$3]);p.ready=$4;Module.aimInputProbe=p; },  
- 285346815: () => { Module.shotPending=false; },  
- 285346843: () => { Module.shotPending=true; },  
- 285346870: () => { if(Module.menuQueue.length<16)Module.menuQueue.push([10,0]); },  
- 285346933: ($0) => { Module.acceptSmoothDrag?.(false,$0); },  
- 285346972: ($0) => { Module.acceptSmoothDrag?.(true,$0); },  
- 285347010: ($0, $1) => { Module.acceptSmoothDrag?.(!!$0,$1); },  
- 285347048: ($0, $1, $2) => { Module.lastMapGesture={};Module.lastMapGesture.pan=!!$0;Module.lastMapGesture.x=$1;Module.lastMapGesture.y=$2; },  
- 285347161: () => { Module.shotPending=false; },  
- 285347189: () => { var old=!!Module.fundsCheck;Module.fundsCheck=true;return old; },  
- 285347254: ($0) => { Module.fundsCheck=!!$0; },  
- 285347280: () => { if(Module.setAimMode)Module.setAimMode(false);else Module.cancelMapGesture?.(); Module.tournamentBoard=null;Module.tournamentDraft=null;Module.menuQueue=[];Module.shotPending=false;Module.mapCourseReady=false;Module.atTitle=true;Module.mobileNotification=null;Module.mobilePhotoCaption=null;Module.snapshotPhotoCaption=null;Module.photoCaptionStack=[];Module.photoRenderSerial=0;Module.roundHUD=null; if(Module.mobileState){Module.mobileState.course=false;Module.mobileState.wasCourse=false;Module.mobileState.roundActive=false;} if(Module.mapPresentation){Module.mapPresentation.course=false;Module.mapPresentation.pendingNative=null;} Module.refreshCanvasPresentation?.(); },  
- 285347959: () => { Module.atTitle=false; },  
- 285347983: ($0, $1, $2, $3, $4) => { if(!Module.panVisual?.atomic)return -1; var p=Module.smoothPanRequest; if(!p||p.serial!==$0||p.rotation!==$1||p.zoom!==$2||p.width!==$3||p.height!==$4)return 0; if(!Number.isInteger(p.x)||!Number.isInteger(p.y)||p.x<0||p.x>49||p.y<0||p.y>49)return 0; return 1+p.x+p.y*50; },  
- 285348259: () => { Module.profileQueue=[]; },  
- 285348285: () => { Module.profileQueue=[];Module.profileState=null; },  
- 285348336: ($0, $1, $2, $3) => { Module.originalChoice=({left:$0,top:$1,right:$2,selected:$3,text:Module.readGameText(0x51a068,4096),time:performance.now()}); },  
- 285348464: () => { Module.profileState=null; },  
- 285348492: ($0) => { var q=Module.profileQueue;if(!q?.length)return 0;var c=q.shift();for(var i=0;i<3;i++)HEAP32[($0>>2)+i]=c[i];return 1; },  
- 285348612: () => { Module.profileQueue=[]; },  
- 285348638: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) => { var p=$0;var s=({active:true,kind:$1,serial:$2,frame:$3,profile:$4,actor:$5,total:$6,spent:$7,remaining:$8,fallback:!!$9,busy:!!$10,title:Module.readGameText($11,2048),skills:[],base:[],names:[]}); s.name=Module.readGameText(0x4d6098,16);s.profession=Module.readGameText(0x4d6088,16); for(var i=0;i<10;i++){s.names.push(Module.readGameText(HEAPU32[(0x4c2c3c>>2)+i],100));s.base.push(HEAPU8[p+i]);var a=s.kind===2?(s.actor<0||HEAP16[(0x57956e+s.actor*256)>>1]===0?0x5a5a04+i:0x5795a8+s.actor*256+i):0x5a5a04+i;s.skills.push(HEAPU8[a]);} s.traits=(['Neat','Outgoing','Active','Playful','Nice']).map(function(name,i){return {name:name,active:!!(HEAPU8[0x4d60a8]&(1<<i))};}); s.appearance=Array.from(HEAPU8.subarray(0x4d60a8,0x4d60b8)); if(s.kind===1||s.kind===2){ var gender=(HEAPU8[0x4d60a9]&128)?0:1;var face=HEAPU8[0x4d60aa];var body=(HEAPU8[0x4d60ab]>>4)&3; var child=!!(HEAPU8[0x4d60b4]&8);var expression=0; s.artParts=([({art:0x5439e0+(body+(child?4:0)+gender*8)*44,x:355,y:116,palette:HEAPU32[0x81ca14>>2]}),({art:face<20?0x59e7c0+((face+gender*20)*3+expression)*44:0x5628e8+((face+gender*72)*3+expression)*44,x:face<20?336:316,y:20})]); } if(s.kind===4){s.facePage=HEAP32[0x5aa55c>>2];s.faceCount=HEAP32[(0x59b76c>>2)+s.actor];s.faces=[];for(var i=0;i<10&&s.facePage+i<s.faceCount;i++)s.faces.push(({item:i,index:s.facePage+i,art:0x562914+(s.facePage+s.actor*72+i)*132}));} s.pointer=([$10,$12,$13,$14,$15]);Module.profileState=s; },  
- 285350078: ($0, $1, $2, $3, $4) => { var point=Module.soundDebug?.mapPosition($0,$1,$2); if(!point)return 0; HEAP32[$3>>2]=point[0];HEAP32[$4>>2]=point[1];return 1; },  
- 285350210: () => { Module.staffHireQueue=[]; },  
- 285350238: () => { Module.staffHire=null;Module.staffHireQueue=[]; },  
- 285350288: ($0) => { Module.staffRenameOriginal=Module.readGameText(0x58587a+$0*76,32); },  
- 285350357: ($0) => { var q=Module.staffHireQueue;if(!q?.length)return 0;var c=q.shift();HEAP32[$0>>2]=c[0];HEAP32[($0>>2)+1]=c[1];return 1; },  
- 285350478: () => { Module.staffHireQueue=[]; },  
- 285350506: ($0, $1, $2, $3, $4, $5, $6) => { var art=$0;var read=Module.readGameText;var options=[]; for(var i=0;i<8;i++)options.push({item:i,name:read(HEAPU32[(0x4c148c>>2)+i],64).trim(),role:read(HEAPU32[(0x4c1464>>2)+i],64),weekly:HEAPU8[0x4c2e2c+i]*100,palette:HEAPU32[(0x81ca14+(0x82+(i>>1)+(i&1)*4)*88)>>2],art:HEAPU32[(art>>2)+i]}); Module.staffOptions=options; Module.staffHire=$1?({active:true,serial:$2,frame:$3,busy:!!$4,fallback:!!$5,options:options}):null; Module.staffRenaming=$6; },  
- 285350960: () => { Module.terrainPreview=null; },  
- 285350990: () => { return !!Module.terrainEdgeActive?.(); },  
- 285351031: () => { return !!Module.terrainMode&&!Module.mobileState?.photoActive; },  
- 285351096: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10) => { Module.terrainPreview=({serial:$0,tile:[$1,$2],point:[$3,$4],valid:!!$5,shape:$6,pending:$7,executed:$8,cursor:[$9,$10]});Module.refreshTerrainReticle?.(); },  
- 285351254: () => { Module.mapCourseReady=true; },  
- 285351284: () => { return Module.viewportRequest?.seq || 0; },  
- 285351329: () => { return Module.viewportRequest.width; },  
- 285351370: () => { return Module.viewportRequest.height; },  
- 285351412: () => { if (Module.cancelMapGesture) Module.cancelMapGesture(); },  
- 285351472: ($0, $1, $2, $3, $4) => { var result = {}; result.seq=$0; result.status=$1; result.reason=UTF8ToString($2); result.width=$3; result.height=$4; Module.viewportResize=result; },  
- 285351623: ($0) => { var str = UTF8ToString($0) + '\n\n' + 'Abort/Retry/Ignore/AlwaysIgnore? [ariA] :'; var reply = window.prompt(str, "i"); if (reply === null) { reply = "i"; } return reply.length === 1 ? reply.charCodeAt(0) : -1; },  
- 285351838: () => { if (typeof(AudioContext) !== 'undefined') { return true; } else if (typeof(webkitAudioContext) !== 'undefined') { return true; } return false; },  
- 285351985: () => { if ((typeof(navigator.mediaDevices) !== 'undefined') && (typeof(navigator.mediaDevices.getUserMedia) !== 'undefined')) { return true; } else if (typeof(navigator.webkitGetUserMedia) !== 'undefined') { return true; } return false; },  
- 285352219: ($0) => { if(typeof(Module['SDL2']) === 'undefined') { Module['SDL2'] = {}; } var SDL2 = Module['SDL2']; if (!$0) { SDL2.audio = {}; } else { SDL2.capture = {}; } if (!SDL2.audioContext) { if (typeof(AudioContext) !== 'undefined') { SDL2.audioContext = new AudioContext(); } else if (typeof(webkitAudioContext) !== 'undefined') { SDL2.audioContext = new webkitAudioContext(); } if (SDL2.audioContext) { if ((typeof navigator.userActivation) === 'undefined') { autoResumeAudioContext(SDL2.audioContext); } } } return SDL2.audioContext === undefined ? -1 : 0; },  
- 285352771: () => { var SDL2 = Module['SDL2']; return SDL2.audioContext.sampleRate; },  
- 285352839: ($0, $1, $2, $3) => { var SDL2 = Module['SDL2']; var have_microphone = function(stream) { if (SDL2.capture.silenceTimer !== undefined) { clearInterval(SDL2.capture.silenceTimer); SDL2.capture.silenceTimer = undefined; SDL2.capture.silenceBuffer = undefined } SDL2.capture.mediaStreamNode = SDL2.audioContext.createMediaStreamSource(stream); SDL2.capture.scriptProcessorNode = SDL2.audioContext.createScriptProcessor($1, $0, 1); SDL2.capture.scriptProcessorNode.onaudioprocess = function(audioProcessingEvent) { if ((SDL2 === undefined) || (SDL2.capture === undefined)) { return; } audioProcessingEvent.outputBuffer.getChannelData(0).fill(0.0); SDL2.capture.currentCaptureBuffer = audioProcessingEvent.inputBuffer; dynCall('vp', $2, [$3]); }; SDL2.capture.mediaStreamNode.connect(SDL2.capture.scriptProcessorNode); SDL2.capture.scriptProcessorNode.connect(SDL2.audioContext.destination); SDL2.capture.stream = stream; }; var no_microphone = function(error) { }; SDL2.capture.silenceBuffer = SDL2.audioContext.createBuffer($0, $1, SDL2.audioContext.sampleRate); SDL2.capture.silenceBuffer.getChannelData(0).fill(0.0); var silence_callback = function() { SDL2.capture.currentCaptureBuffer = SDL2.capture.silenceBuffer; dynCall('vp', $2, [$3]); }; SDL2.capture.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1000); if ((navigator.mediaDevices !== undefined) && (navigator.mediaDevices.getUserMedia !== undefined)) { navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(have_microphone).catch(no_microphone); } else if (navigator.webkitGetUserMedia !== undefined) { navigator.webkitGetUserMedia({ audio: true, video: false }, have_microphone, no_microphone); } },  
- 285354532: ($0, $1, $2, $3) => { var SDL2 = Module['SDL2']; SDL2.audio.scriptProcessorNode = SDL2.audioContext['createScriptProcessor']($1, 0, $0); SDL2.audio.scriptProcessorNode['onaudioprocess'] = function (e) { if ((SDL2 === undefined) || (SDL2.audio === undefined)) { return; } if (SDL2.audio.silenceTimer !== undefined) { clearInterval(SDL2.audio.silenceTimer); SDL2.audio.silenceTimer = undefined; SDL2.audio.silenceBuffer = undefined; } SDL2.audio.currentOutputBuffer = e['outputBuffer']; dynCall('vp', $2, [$3]); }; SDL2.audio.scriptProcessorNode['connect'](SDL2.audioContext['destination']); if (SDL2.audioContext.state === 'suspended') { SDL2.audio.silenceBuffer = SDL2.audioContext.createBuffer($0, $1, SDL2.audioContext.sampleRate); SDL2.audio.silenceBuffer.getChannelData(0).fill(0.0); var silence_callback = function() { if ((typeof navigator.userActivation) !== 'undefined') { if (navigator.userActivation.hasBeenActive) { SDL2.audioContext.resume(); } } SDL2.audio.currentOutputBuffer = SDL2.audio.silenceBuffer; dynCall('vp', $2, [$3]); SDL2.audio.currentOutputBuffer = undefined; }; SDL2.audio.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1000); } },  
- 285355707: ($0, $1) => { var SDL2 = Module['SDL2']; var numChannels = SDL2.capture.currentCaptureBuffer.numberOfChannels; for (var c = 0; c < numChannels; ++c) { var channelData = SDL2.capture.currentCaptureBuffer.getChannelData(c); if (channelData.length != $1) { throw 'Web Audio capture buffer length mismatch! Destination size: ' + channelData.length + ' samples vs expected ' + $1 + ' samples!'; } if (numChannels == 1) { for (var j = 0; j < $1; ++j) { setValue($0 + (j * 4), channelData[j], 'float'); } } else { for (var j = 0; j < $1; ++j) { setValue($0 + (((j * numChannels) + c) * 4), channelData[j], 'float'); } } } },  
- 285356312: ($0, $1) => { var SDL2 = Module['SDL2']; var buf = $0 >>> 2; var numChannels = SDL2.audio.currentOutputBuffer['numberOfChannels']; for (var c = 0; c < numChannels; ++c) { var channelData = SDL2.audio.currentOutputBuffer['getChannelData'](c); if (channelData.length != $1) { throw 'Web Audio output buffer length mismatch! Destination size: ' + channelData.length + ' samples vs expected ' + $1 + ' samples!'; } for (var j = 0; j < $1; ++j) { channelData[j] = HEAPF32[buf + (j*numChannels + c)]; } } },  
- 285356801: ($0) => { var SDL2 = Module['SDL2']; if ($0) { if (SDL2.capture.silenceTimer !== undefined) { clearInterval(SDL2.capture.silenceTimer); } if (SDL2.capture.stream !== undefined) { var tracks = SDL2.capture.stream.getAudioTracks(); for (var i = 0; i < tracks.length; i++) { SDL2.capture.stream.removeTrack(tracks[i]); } } if (SDL2.capture.scriptProcessorNode !== undefined) { SDL2.capture.scriptProcessorNode.onaudioprocess = function(audioProcessingEvent) {}; SDL2.capture.scriptProcessorNode.disconnect(); } if (SDL2.capture.mediaStreamNode !== undefined) { SDL2.capture.mediaStreamNode.disconnect(); } SDL2.capture = undefined; } else { if (SDL2.audio.scriptProcessorNode != undefined) { SDL2.audio.scriptProcessorNode.disconnect(); } if (SDL2.audio.silenceTimer !== undefined) { clearInterval(SDL2.audio.silenceTimer); } SDL2.audio = undefined; } if ((SDL2.audioContext !== undefined) && (SDL2.audio === undefined) && (SDL2.capture === undefined)) { SDL2.audioContext.close(); SDL2.audioContext = undefined; } },  
- 285357807: ($0, $1, $2) => { var w = $0; var h = $1; var pixels = $2; if (!Module['SDL2']) Module['SDL2'] = {}; var SDL2 = Module['SDL2']; if (SDL2.ctxCanvas !== Module['canvas']) { SDL2.ctx = Browser.createContext(Module['canvas'], false, true); SDL2.ctxCanvas = Module['canvas']; } if (SDL2.w !== w || SDL2.h !== h || SDL2.imageCtx !== SDL2.ctx) { SDL2.image = SDL2.ctx.createImageData(w, h); SDL2.w = w; SDL2.h = h; SDL2.imageCtx = SDL2.ctx; } var data = SDL2.image.data; var src = pixels / 4; var dst = 0; var num; if (typeof CanvasPixelArray !== 'undefined' && data instanceof CanvasPixelArray) { num = data.length; while (dst < num) { var val = HEAP32[src]; data[dst ] = val & 0xff; data[dst+1] = (val >> 8) & 0xff; data[dst+2] = (val >> 16) & 0xff; data[dst+3] = 0xff; src++; dst += 4; } } else { if (SDL2.data32Data !== data) { SDL2.data32 = new Int32Array(data.buffer); SDL2.data8 = new Uint8Array(data.buffer); SDL2.data32Data = data; } var data32 = SDL2.data32; num = data32.length; data32.set(HEAP32.subarray(src, src + num)); var data8 = SDL2.data8; var i = 3; var j = i + 4*num; if (num % 8 == 0) { while (i < j) { data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; } } else { while (i < j) { data8[i] = 0xff; i = i + 4 | 0; } } } SDL2.ctx.putImageData(SDL2.image, 0, 0); },  
- 285359273: ($0, $1, $2, $3, $4) => { var w = $0; var h = $1; var hot_x = $2; var hot_y = $3; var pixels = $4; var canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h; var ctx = canvas.getContext("2d"); var image = ctx.createImageData(w, h); var data = image.data; var src = pixels / 4; var dst = 0; var num; if (typeof CanvasPixelArray !== 'undefined' && data instanceof CanvasPixelArray) { num = data.length; while (dst < num) { var val = HEAP32[src]; data[dst ] = val & 0xff; data[dst+1] = (val >> 8) & 0xff; data[dst+2] = (val >> 16) & 0xff; data[dst+3] = (val >> 24) & 0xff; src++; dst += 4; } } else { var data32 = new Int32Array(data.buffer); num = data32.length; data32.set(HEAP32.subarray(src, src + num)); } ctx.putImageData(image, 0, 0); var url = hot_x === 0 && hot_y === 0 ? "url(" + canvas.toDataURL() + "), auto" : "url(" + canvas.toDataURL() + ") " + hot_x + " " + hot_y + ", auto"; var urlBuf = _malloc(url.length + 1); stringToUTF8(url, urlBuf, url.length + 1); return urlBuf; },  
- 285360261: ($0) => { if (Module['canvas']) { Module['canvas'].style['cursor'] = UTF8ToString($0); } },  
- 285360344: () => { if (Module['canvas']) { Module['canvas'].style['cursor'] = 'none'; } },  
- 285360413: () => { return window.innerWidth; },  
- 285360443: () => { return window.innerHeight; }
+  285334284: () => { return Module.quiet ? 1 : 0; },  
+ 285334317: () => { console.log(new Error().stack); },  
+ 285334353: ($0, $1) => { const w = $0; const h = $1; if (typeof Module.fitCanvas === 'function') Module.fitCanvas(w, h); else { Module.canvas.style.width = 'min(100vw, calc(100vh * ' + w + ' / ' + h + '))'; Module.canvas.style.aspectRatio = w + ' / ' + h; } },  
+ 285334590: ($0, $1, $2, $3, $4) => { if (Module.fitCanvas) Module.fitCanvas($0, $1); var buffers = {}; buffers.width=$0; buffers.height=$1; buffers.screen=$2; buffers.oldRendererViewport=Array.from(HEAP32.subarray($3>>2,($3>>2)+4)); buffers.rendererViewport=Array.from(HEAP32.subarray($4>>2,($4>>2)+4)); Module.viewportBuffers=buffers; },  
+ 285334893: ($0, $1, $2, $3, $4, $5, $6) => { Module.autosaveState=({slots:3,intervalSeconds:180,active:!!$0,elapsedSeconds:$1,nextSlot:$2||null,completed:$3,failures:$4,inputDepth:$5,nativeActive:!!$6,pageVisible:!document.hidden}); },  
+ 285335083: () => { const dir='/game/'+(FS.readdir('/game').find(n=>n.toLowerCase()==='saved games')||'Saved Games'); let oldest=Infinity;let slot=1; for(let i=1;i<=3;i++){const name='&AutoSave'+i+'.sve';const actual=FS.readdir(dir).find(n=>n.toLowerCase()===name.toLowerCase());if(!actual)return i;const t=Module.gameFileModified?.('Saved Games/'+actual)||0;if(t<oldest){oldest=t;slot=i;}} return slot; },  
+ 285335471: () => { return Module.autosaveWriteSerial||0; },  
+ 285335511: () => { return Module.autosaveWriteSerial||0; },  
+ 285335551: () => { Module.autosaveError='Automatic save could not be written. Please save or export a backup.'; },  
+ 285335646: () => { return !document.hidden&&!!Module.mapCourseReady&&!Module.courseLoading?.active&&!Module.loadState&&!Module.saveFilesOpen&&!Module.backupHistoryOpen; },  
+ 285335800: () => { var v=new URLSearchParams(location.search).get('characters');return v==='probe'?1:v==='verify'?3:v==='0'||v==='off'?0:2; },  
+ 285335923: () => { return Module.mapCourseReady&&!Module.atTitle&&!!Module.mobileState?.course&&!Module.uiPresentation; },  
+ 285336026: ($0, $1, $2, $3, $4) => { var failures=Module.characterPixelExamples||(Module.characterPixelExamples=[]);if(failures.length<4){var pixels=[];for(var k=0;k<$2&&pixels.length<12;k++)if(HEAPU32[($0>>2)+k]!==HEAPU32[($1>>2)+k])pixels.push([k,HEAPU32[($0>>2)+k],HEAPU32[($1>>2)+k],HEAPU8[$3+k]]);failures.push({pixels:pixels,frame:$4,course:Module.mobileState?.course,atTitle:Module.atTitle});} },  
+ 285336392: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) => { Module.characterReplay=({mode:$9?'30fps':'probe',frames:$0,pixelFailures:$1,stateFailures:$2,lastDifferentPixels:$3,lastReplayMs:$4,meanReplayMs:$5,maxReplayMs:$6,sprites:$7,frame:$8,visualFrames:$10,moving:$11,active:!!$12,disabled:!!$13,intervalMs:$14,tailPixels:$15}); },  
+ 285336666: ($0, $1, $2, $3, $4, $5, $6, $7) => { var r=Module.characterReplay;r.labels=$0;r.labelsValid=!!$1;r.tailActorPixels=$2;r.tickSeen=$3;r.tickBlockedFrame=$4;r.extraFrames=$5;r.statusLines=$6;r.statusLinesValid=!!$7; },  
+ 285336844: () => { var s=Module.mobileState;var p=Module.panVisual;var v=Module.mapPresentation;return !!s?.course&&!Module.courseLoading?.active&&!s.paused&&!s.constructing&&!s.photoActive&&!Module.uiPresentation&&!Module.aimMode&&!Module.terrainMode&&!Module.lotMode&&!v?.zooming&&!v?.pendingNative&&!p?.drag&&!p?.held&&!p?.rest&&!Module.menuQueue?.length&&!Module.loadState&&!Module.profileState; },  
+ 285337227: ($0, $1) => { var changed=[];for(var i=0;i<$1&&changed.length<24;i++)if(HEAPU8[$0+i]!==HEAPU8[0x4d6098+i])changed.push([0x4d6098+i,HEAPU8[$0+i],HEAPU8[0x4d6098+i]]);Module.characterStateDiff=changed; },  
+ 285337415: ($0, $1, $2, $3) => { const s=Module.courseLoading;return s?.active&&!$2&&!$3&&Module.readGameText($0,100)===s.file?(Module.courseLoadingStage('save'),s.nativeReads++,s.serial):0; },  
+ 285337575: ($0) => { if(Module.courseLoading?.serial===$0)Module.courseLoadingStage?.('map'); },  
+ 285337650: () => { Module.courseLoadingStage?.('artwork'); },  
+ 285337692: () => { Module.courseLoadingStage?.('artwork'); },  
+ 285337734: () => { Module.courseLoadingStage?.('terrain'); },  
+ 285337776: () => { return !!Module.courseLoading?.active; },  
+ 285337817: () => { const s=Module.courseLoading;return !!s?.active&&s.readyToContinue&&!s.enterRequested; },  
+ 285337906: () => { if(Module.courseLoading)Module.courseLoading.nativeHeld=true; },  
+ 285337970: () => { if(Module.courseLoading)Module.courseLoading.nativeHeld=false; },  
+ 285338035: () => { return Module.gameEdition==='enhanced'; },  
+ 285338077: ($0) => { const id=(['gameSpeed','pauseControl','clubhouseRelocation'])[$0];return !!id&&!!Module.hasGameFeature?.(id); },  
+ 285338189: () => { Module.showEditionNotice?.(Module.gameEdition==='enhanced'?'Clubhouse relocation is turned off in Enhanced settings. Your clubhouse has been kept.':'Clubhouse relocation is available in Enhanced mode. Your clubhouse has been kept.'); },  
+ 285338425: ($0, $1, $2, $3, $4, $5, $6, $7, $8) => { Module.eraseState=({phase:$0,queued:$1,presses:$2,tile:[$3,$4],serial:$5,reason:UTF8ToString($6),seen:$7,confirm:$8}); },  
+ 285338546: () => { return Module.mapMode===2; },  
+ 285338575: () => { Module.golferCardQueue=[];if(Module.golferCard)Module.golferCard.active=false; },  
+ 285338656: ($0) => { var q=Module.golferCardQueue;if(!q?.length)return 0;var c=q.shift();for(var i=0;i<3;i++)HEAP32[($0>>2)+i]=c[i];return 1; },  
+ 285338779: () => { return !!Module.golferCard?.active; },  
+ 285338817: () => { Module.golferCardQueue=[]; },  
+ 285338846: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10) => { Module.golferCard=({active:true,actor:$0,serial:$1,frame:$2,busy:!!$3,left:$4,top:$5,width:$6,height:$7,expanded:!!$8,hover:HEAP32[0x824130>>2]}); Module.drawGolferCard?.($9,$10,Module.golferCard); },  
+ 285339048: ($0, $1, $2, $3, $4, $5) => { Module.golferPairs=({active:true,serial:$0,frame:$1,busy:!!$2});if($3)Module.drawGolferPairs?.($4,$5); },  
+ 285339153: ($0) => { var q=Module.golferPairsQueue;if(!q?.length)return 0;var c=q.shift();for(var i=0;i<3;i++)HEAP32[($0>>2)+i]=c[i];return 1; },  
+ 285339277: () => { Module.golferPairsQueue=[];Module.golferPairs=null; },  
+ 285339331: () => { Module.golferPairsQueue=[];Module.golferPairs=null; },  
+ 285339385: ($0) => { const q=Module.holeStatsQueue;if(!q?.length)return 0;const c=q.shift();return c[0]===$0&&c[1]===1; },  
+ 285339486: () => { return !!Module.beginHoleStats; },  
+ 285339520: ($0, $1) => { return Module.beginHoleStats($0,$1)?1:0; },  
+ 285339563: ($0) => { Module.endHoleStats?.($0); },  
+ 285339592: () => { Module.holeStatsDraft=[]; },  
+ 285339620: ($0, $1, $2) => { const s=Module.holeStats;if(s?.active&&s.serial===$0){s.frame=$1;s.lines=Module.holeStatsDraft||[];s.busy=!!$2;Module.renderHoleStats?.(s);} },  
+ 285339763: ($0, $1, $2, $3, $4, $5) => { const q=Module.holeStatsDraft;if(q&&q.length<100)q.push({text:Module.readGameText($0,$1),x:$2,y:$3,centered:!!$4,color:$5>>>0}); },  
+ 285339894: () => { Module.homeInfo=null; },  
+ 285339918: () => { return Module.homeInfo?.mode==='tap'; },  
+ 285339958: () => { return Module.homeInfo?.slot??-1; },  
+ 285339994: () => { return Module.homeInfo?.mode==='tap'; },  
+ 285340034: () => { return !!Module.mapCourseReady&&!Module.uiPresentation&&!Module.loadState&&!Module.profileState&&!Module.courseLoading?.active&&!Module.progressScreen?.active&&!Module.holeStats?.active&&!Module.startupMenu?.active&&!Module.locationState?.active&&!Module.saveFilesOpen; },  
+ 285340306: ($0, $1, $2, $3, $4, $5) => { Module.homeInfo=({slot:$0,tile:[$1,$2],owner:$3,occupied:$3>0,name:$4?Module.readGameText($4,32):'',mode:$5?'tap':'hover',source:'original-home-owner'}); },  
+ 285340462: () => { Module.loadDeleteConfirm=true; },  
+ 285340495: () => { Module.loadDeleteConfirm=false; },  
+ 285340529: () => { return !!Module.mobileUI; },  
+ 285340557: () => { Module.loadQueue=[];Module.loadState=null; },  
+ 285340602: () => { Module.loadQueue=[];Module.loadState=null;Module.courseLoadingFinished?.(); },  
+ 285340680: ($0, $1, $2, $3, $4, $5, $6) => { var rows=[]; for(var i=0;i<Math.min($0,100);i++){ var name=Module.readGameText(0x80b130+i*100,100); rows.push({index:i,name:name,modified:Module.gameFileModified?.('Saved Games/'+name)||null}); } var preview=null; if($1>=0&&$1<$0){ var index=HEAP32[0x59bf90>>2];var type=index>=0&&index<16?HEAP8[0x571ff4+index*46]:-1; var template=0x4c1ea8+type*130;var custom=HEAP16[0x59d81c>>1];var emblem=type>=0&&type<16?HEAPU8[template]:-1; preview=({name:type>=0&&type<16?Module.readGameText(custom>=0&&custom<0x2324?0x56fcb0+custom:template+1,129):'',designer:Module.readGameText(0x4d6098,16),theme:Module.readGameText(0x567328,128),holes:[],par:HEAP32[0x59aafc>>2],yards:HEAP32[0x58d36c>>2],cash:HEAP32[0x571fd4>>2]*100,fun:HEAP32[0x59ae78>>2],length:HEAP32[0x5a882c>>2]/100,accuracy:HEAP32[0x56949c>>2]/100,imagination:HEAP32[0x5a636c>>2]/100,art:emblem>=0&&emblem<16?0x541710+emblem*44:0,mask:emblem>=0&&emblem<16?0x5791f8+emblem*44:0}); for(var h=1;h<Math.min(HEAP32[0x5685f0>>2],19);h++){var a=0x575ab0+h*520;preview.holes.push({hole:h,par:HEAPU8[a],yards:HEAP16[(a+4)>>1]});} } Module.loadState=({serial:$3,rows:rows,total:$0,selected:$1,offset:$2,preview:preview,fallback:!!$4,busy:!!$5||$6>=0,active:true}); },  
+ 285341891: () => { if(Module.loadState)Module.loadState.suspended=true; },  
+ 285341946: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) => { if(Module.loadState)Module.loadState.suspended=false;if(Module.loadTrace)Module.loadInput=([$0,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11]); },  
+ 285342081: ($0) => { var q=Module.loadQueue;if(!q?.length)return 0;var c=q.shift();for(var i=0;i<3;i++)HEAP32[($0>>2)+i]=c[i];HEAP32[($0>>2)+3]=c[1]!==4||(c[2]>=0&&c[2]<100&&c[3]===Module.readGameText(0x80b130+c[2]*100,100));return 1; },  
+ 285342297: () => { Module.loadQueue=[]; },  
+ 285342320: ($0) => { Module.loadDeleteName=Module.readGameText($0,100); },  
+ 285342373: () => { Module.beginCourseLoading?.(Module.loadState); },  
+ 285342422: () => { Module.locationQueue=[];Module.locationState=null; },  
+ 285342475: ($0, $1) => { Module.locationResult=({record:$0,location:$0>=0&&$0<16?HEAPU8[0x571ff4+$0*46]:-1,spent:($1-HEAP32[0x571fd4>>2])*100});Module.locationState=null;Module.locationQueue=[]; },  
+ 285342647: () => { if(Module.locationState)Module.locationState.suspended=true; },  
+ 285342710: ($0) => { var q=Module.locationQueue;if(!q?.length)return 0;var c=q.shift();for(var i=0;i<5;i++)HEAP32[($0>>2)+i]=c[i]??-1;return 1; },  
+ 285342835: () => { Module.locationQueue=[]; },  
+ 285342862: ($0, $1, $2, $3, $4, $5) => { var rows=[]; for(var id=0;id<16;id++){ var index=-1;for(var i=0;i<16;i++)if(HEAPU8[0x571ff4+i*46]===id){index=i;break;} if(index<0)continue;var a=0x571fd8+index*46;var t=0x4c1e90+id*130;var cost=HEAP32[($0>>2)+index]*100;var purchased=HEAPU8[a+34]!==255; rows.push({id:id,index:index,name:Module.readGameText(t,24),bonus:Module.readGameText(t+65,65),acres:HEAPU8[a+29],price:cost,purchased:purchased,available:!purchased&&(cost<=HEAP32[0x571fd4>>2]*100||HEAP32[0x5a6364>>2]===17),environment:HEAPU8[t+62],coast:HEAPU8[t+63],slope:HEAPU8[t+64]}); } Module.locationState=({active:true,serial:$1,frame:$2,busy:!!$3,fallback:!!$4,suspended:false,rows:rows,cash:HEAP32[0x571fd4>>2]*100,unlimited:!!(HEAPU32[0x59e7b8>>2]&0x1000000),newGame:!HEAPU32[0x834170>>2],hover:$5}); },  
+ 285343634: () => { Module.lotPreview=null;Module.lotPending=false; },  
+ 285343684: () => { return !!Module.lotMode; },  
+ 285343711: () => { return !!Module.lotEdgeActive?.(); },  
+ 285343748: () => { Module.lotPreview=null; },  
+ 285343774: () => { Module.lotPending=true; },  
+ 285343800: () => { Module.lotPending=false; },  
+ 285343827: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9) => { Module.lotPreview=({kind:$0,variant:$1,serial:$2,point:[$3,$4],tile:[$5,$6],valid:!!$7,price:$8,reason:UTF8ToString($9)}); },  
+ 285343952: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10) => { Module.lotPreview=({kind:4,variant:$10,serial:$0,point:[$1,$2],tile:[$3,$4],valid:!!$5,price:$6,radius:$7,free:!!$8,reason:$9?'Choose an empty site':''}); },  
+ 285344109: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9) => { Module.lotPreview=({kind:5,serial:$0,point:[$1,$2],tile:[$3,$4],valid:!!$5,value:$6,preparation:$7,profit:$6-$7,lots:$8,reason:$9?'Choose an empty site':$5?'':'Location not attractive enough'}); },  
+ 285344306: () => { return !!Module.lotMode; },  
+ 285344333: () => { Module.lotPreview=null;Module.lotPending=false; },  
+ 285344383: () => { Module.lotPending=false; },  
+ 285344410: ($0, $1, $2, $3) => { Module.lotProfitLabel=({x:$0,y:$1,profit:$2,text:UTF8ToString($3),color:$2>0?"green":"red"}); },  
+ 285344506: () => { Module.photoRenderSerial=(Module.photoRenderSerial||0)+1; },  
+ 285344566: () => { return !!Module.mobileState?.wasCourse; },  
+ 285344608: ($0) => { var n={};n.text=Module.readGameText(0x51a068);n.time=performance.now();n.blocking=!!Module.fundsCheck;n.photoSerial=$0?(Module.photoRenderSerial||0):0;Module.mobileNotification=n;var owner=HEAP32[0x4c2e0c>>2];if(owner!==-1)owner&=255;if(owner!==-1&&HEAP32[0x4c2e08>>2]===owner&&n.text){if(!Module.snapshotPhotoCaption||Module.snapshotPhotoCaption.owner!==owner)Module.snapshotPhotoCaption=({owner:owner,text:n.text});if(Module.snapshotPhotoCaption.text===n.text)n.snapshotOwner=owner;} },  
+ 285345096: ($0) => { Module.tournamentDraft=$0?({headings:[],rows:[]}):null;if(!$0)Module.tournamentBoard=null; },  
+ 285345189: ($0, $1) => { var d=Module.tournamentDraft;if(d)d[$1?'rows':'headings'].push(Module.readGameText($0)); },  
+ 285345280: () => { Module.tournamentBoard=Module.tournamentDraft;Module.tournamentDraft=null; },  
+ 285345357: ($0) => { var q=Module.gameTextQueue; if(q&&q.length){if($0)q.push($0);var c=q.shift();Module.mobileTextPending=q.length;return c;} return $0; },  
+ 285345494: () => { return !!Module.gameTextQueue?.length; },  
+ 285345535: () => { if(Module.gameTextQueue)Module.gameTextQueue.length=0;if(Module.mobileState)Module.mobileState.textInput=true; },  
+ 285345648: () => { if(Module.mobileState)Module.mobileState.textInput=false;if(Module.gameTextQueue)Module.gameTextQueue.length=0;Module.mobileTextPending=0; },  
+ 285345789: ($0) => { if(Module.menuQueue.length<16)Module.menuQueue.push([18,$0]); },  
+ 285345853: ($0) => { var q=Module.menuQueue;if(!q||!q.length)return 0;var c=q.shift();HEAP32[$0>>2]=c[0];HEAP32[($0>>2)+1]=c[1];return 1; },  
+ 285345972: ($0) => { return Module.mapPresentation?.pendingNative===$0; },  
+ 285346025: ($0) => { if(Module.mapPresentation?.pendingNative===$0)Module.menuQueue.push([11,$0]); },  
+ 285346105: ($0) => { var v=Module.mapPresentation;if(v){v.nativeAck=$0;v.nativeAckSerial=v.serial;if(Module.mobileState)Module.mobileState.zoom=$0;} },  
+ 285346235: ($0, $1, $2) => { Module.menuResult={};Module.menuResult.kind=$0;Module.menuResult.item=$1;Module.menuResult.status=$2; },  
+ 285346339: () => { Module.mapCourseReady=false; },  
+ 285346370: () => { Module.staffPortraitsSuppressed=(Module.staffPortraitsSuppressed||0)+1; },  
+ 285346444: ($0) => { var a=Array.from(HEAP32.subarray($0>>2,($0>>2)+17));var p={};p.serial=a[0];p.expected=a.slice(1,3);p.actual=a.slice(3,5);p.view=a.slice(5,11);p.expectedView=a.slice(11,17);Module.aimPreviewProbe=p; },  
+ 285346644: ($0, $1, $2, $3, $4) => { var n={};n.serial=$0;n.point=([$1,$2]);n.tile=([$3,$4]);Module.aimAck=n; },  
+ 285346719: ($0, $1) => { var n=Module.roundHUD;if(!n||$1===0)n=Module.roundHUD={lines:[]};n.lines[$1]=Module.readGameText($0);n.time=performance.now(); },  
+ 285346848: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10) => { Module.onMapPresent?.({valid:!!$0&&!!Module.mapCourseReady&&!Module.atTitle,x:$1,y:$2,rotation:$3,zoom:$4,width:$5,height:$6,rgba:$7,requestedX:$8,requestedY:$9,logicalZoom:$10});return $0&&$7&&Module.panVisual?.atomic?1:0; },  
+ 285347074: () => { return !document.hidden&&!!Module.panVisual?.drag?.accepted; },  
+ 285347137: () => { Module.renderSliceCount=(Module.renderSliceCount||0)+1; },  
+ 285347195: ($0, $1, $2) => { Module.finishSmoothPan?.($0,$1,$2); },  
+ 285347233: ($0) => { var s=Module.panVisual;if(s&&(!$0||s.serial===$0))s.nativeOwned=false;if(Module.smoothPanRequest?.serial===$0)Module.smoothPanRequest=null; },  
+ 285347375: () => { Module.shotPending=false;Module.aimAck=null; },  
+ 285347422: ($0, $1) => { Module.proIntroSerial=(Module.proIntroSerial||0)+1;Module.proIntro=({serial:Module.proIntroSerial,golfer:$0,opponent:$1}); },  
+ 285347547: () => { Module.proIntro=null; },  
+ 285347571: () => { var note=Module.mobileNotification;Module.photoCaptionStack=Module.photoCaptionStack||[];Module.photoCaptionStack.push(Module.mobilePhotoCaption||null);Module.mobilePhotoCaption=note?.photoSerial===Module.photoRenderSerial?note:null;Module.setAimMode(false);if(Module.mobileState){Module.mobileState.photoActive=true;Module.mobileState.photoWait=true;Module.mobileState.shotReady=false;} },  
+ 285347961: ($0) => { Module.mobilePhotoCaption=Module.photoCaptionStack?.pop()||null;Module.cancelMapGesture();if(Module.mobileState){Module.mobileState.photoWait=!!$0;Module.mobileState.photoActive=!!$0||HEAP32[0x4c2e0c>>2]!==-1;} },  
+ 285348174: () => { return !!Module.mobileUI; },  
+ 285348202: ($0) => { Module.turnSerial=$0;Module.roundHUD=null; },  
+ 285348247: ($0, $1, $2, $3, $4, $5, $6) => { var s=Module.mobileState||{};s.course=!!$0&&!!Module.mapCourseReady;s.textInput=!!$2;s.wasCourse=s.wasCourse||s.course;s.hidden=!!$1; s.tool=HEAP32[0x4c2848>>2];s.object=HEAP32[0x4c2854>>2];s.tab=HEAP32[0x567afc>>2]; s.constructing=s.tool>=0||s.object>=0||!!(HEAP32[0x59e7b8>>2]&2); s.elevation=s.tab===1&&!!HEAP32[0x55e928>>2]&&!!(HEAP32[0x59e7b8>>2]&2);s.terrainShape=HEAP32[0x542f20>>2]; s.zoom=HEAP32[0x4c2844>>2];s.rotation=HEAP32[0x5685f4>>2];s.paused=!!(HEAP32[0x59e7b8>>2]&4);s.speed=$6;s.cash=HEAP32[0x571fd4>>2]*100; var note=Module.mobileNotification; var owner=HEAP32[0x4c2e0c>>2];var photo=!!$5||owner!==-1; if(owner!==-1)owner&=255; if(owner===-1)Module.snapshotPhotoCaption=null; if(owner!==-1&&(!Module.snapshotPhotoCaption||Module.snapshotPhotoCaption.owner!==owner)&&HEAPU8[0x569498]&&HEAP32[0x4c2e08>>2]===owner){var originalText=Module.readGameText(0x5a6d40);if(originalText)Module.snapshotPhotoCaption=({owner:owner,text:originalText});} var caption=$5?Module.mobilePhotoCaption:(Module.snapshotPhotoCaption?.owner===owner?Module.snapshotPhotoCaption:null); s.message=photo?(caption?.text||''):(note&&!note.photoSerial&&note.snapshotOwner===undefined&&(performance.now()-note.time<650||(note.blocking&&Module.fundsCheck))?note.text:''); s.fundsCheck=!!Module.fundsCheck; s.funRating=HEAP32[0x59ae78>>2];s.skillRating=HEAP32[0x541cd8>>2]; s.tournamentActive=!!(HEAPU32[0x59e7b8>>2]&0x200000); if(!s.tournamentActive){Module.tournamentBoard=null;Module.tournamentDraft=null;} s.roundGolfer=HEAP32[0x5a59f8>>2];s.roundActive=s.roundGolfer>=0&&s.roundGolfer<=152;s.shotMask=$3;s.shot=HEAP32[0x58f330>>2];s.shotTurn=s.roundActive&&s.tab===3&&!!$3;s.photoWait=!!$5;s.photoActive=s.photoWait||HEAP32[0x4c2e0c>>2]!==-1;s.shotReady=s.shotTurn&&!s.photoActive&&HEAP32[0x5a34e4>>2]<1;s.turnSerial=Module.turnSerial||0; s.scorecard=[]; if(s.roundActive){ var ids=[s.roundGolfer];var partner=HEAP16[(0x57955a+s.roundGolfer*256)>>1]; if(partner>=0&&partner<=152&&partner!==s.roundGolfer&&HEAP8[0x5794d9+partner*256]>0)ids.push(partner); for(var id of ids){ var profile=HEAP16[(0x57956e+id*256)>>1]; if(profile<0||profile>=512)continue; var card=({id:id,name:Module.readGameText(0x4d6098+profile*560,560),hole:HEAP8[0x5794d9+id*256],current:HEAP8[0x5794da+id*256],holes:[]}); for(var h=1;h<=18;h++){var par=HEAPU8[0x575ab0+h*520];if(par)card.holes.push({hole:h,par:par,score:HEAP8[0x5794db+id*256+h]});} s.scorecard.push(card); } } s.availableLots=HEAP32[0x56d1b0>>2]; s.rebuildClubhouse=!!(HEAP32[0x59e7b8>>2]&0x800); s.hole=HEAP32[0x5685f0>>2]; var h=0x575ab0+s.hole*520; function readyHole(id){var h=0x575ab0+id*520;return id>=1&&id<=18&&HEAPU8[h]===0&&HEAP32[(h+8)>>2]!==0&&HEAP32[(h+24)>>2]!==0&&(!(HEAP32[0x59e7b8>>2]&64)||HEAP32[(h+16)>>2]!==0);} s.openableHole=readyHole(s.hole)?s.hole:0; if(!s.openableHole)for(var id=1;id<=18;id++)if(readyHole(id)){s.openableHole=id;break;} s.canOpenHole=!!s.openableHole; s.openHoles=0;for(var h=1;h<=18;h++)if(HEAPU8[0x575ab0+h*0x208])s.openHoles++; if(s.course){ s.terrain=[];for(var i=0;i<16;i++){var id=HEAPU8[0x4c79a0+i];var name=Module.readGameText(0x578350+id*48,48);if(name)s.terrain.push({id:id,name:name,art:0x570cb8+i*176});} var counts=({1:5,4:14,2:15,16:7,19:8}); s.variation=s.tab===0&&HEAP32[0x55e924>>2]&&counts[s.object]?({count:counts[s.object],selected:HEAP32[0x5a9f60>>2],mask:s.object===4?HEAPU32[0x543cfc>>2]:0}):null; var landmarkNames=([0x4c4c3c,0x4c4c20,0x4c4bec,0x4c4bc4,0x4c4ba0,0x4c4b80,0x4c4b4c,0x4c4b20,0x4c4b04,0x4c4ae8,0x4c4ad4,0x4c4aa0,0x4c4a84,0x4c4a50]); s.landmarks=landmarkNames.map(function(p,i){return ({id:i,name:Module.readGameText(p,64),unlocked:!!(HEAPU32[0x543cfc>>2]&(1<<i)),free:!!(HEAPU32[0x822c70>>2]&(1<<i)),price:(HEAPU32[0x822c70>>2]&(1<<i))?0:((i*5+25)*200)/100*100,radius:Math.trunc((i*5+40)*5/4),group:i&3});}); s.buildings=[];s.buildingDetails=[];for(var i=0;i<9;i++){ var kind=i+6;var level=HEAP32[(0x5a8c38+kind*4)>>2];var base=HEAP16[(0x4c26c2+kind*20)>>1];var name=Module.readGameText(0x4c2728+i*20,16); s.buildings.push(name);s.buildingDetails.push({id:i,kind:kind,name:name,level:level,price:Math.trunc(base*(level+2)/2)*100,side:HEAP8[0x4c26c0+kind*20]+level,unlocked:kind<HEAP32[0x5a6364>>2]&&level<2}); } s.employees=[];s.staff=[]; for(var i=0;i<Math.min(8,HEAP32[0x5aa6c0>>2]);i++){ var id=HEAP32[(0x5aa5b8>>2)+i];if(id<0||id>=64)continue; var base=0x585850+id*76;var flags=HEAPU8[base+18];var type=HEAP8[base+19];var role=((flags&8)>>3)-(type*2+4); if(!flags||role<0||role>=8)continue; var name=Module.readGameText(base+42,32)||Module.readGameText(HEAPU32[(0x4c148c>>2)+role],64).trim(); s.employees.push(name);s.staff.push({id:id,item:i+8,name:name,roleIndex:role,role:Module.readGameText(HEAPU32[(0x4c1464>>2)+role],64),weekly:HEAPU8[0x4c2e2c+role]*100,hired:HEAP16[(base+34)>>1],activity:HEAP16[(base+36)>>1]}); } s.staffOffset=HEAP32[0x5aa558>>2];s.staffTotal=HEAP32[0x5aa6c0>>2]+s.staffOffset; s.staffOpen=!!HEAP32[0x561254>>2];s.employeeSelected=HEAP32[0x4c7aec>>2]; s.staffRound=!!$4;s.movingWorker=HEAP32[0x4c2e10>>2]>=0&&HEAP32[0x4c2e10>>2]<64; s.golfers=[];if(s.tab===2)for(var i=0;i<16;i++){var id=HEAP32[(0x5a9cf0>>2)+i];if(id>=0&&id<152){var profile=HEAP16[(0x57946e+id*256)>>1];if(profile>=0&&profile<512)s.golfers.push({item:i,name:Module.readGameText(0x4d6098+profile*560,560)});}} } Module.mobileState=s; },  
+ 285353590: ($0) => { var q=Module.touchQueue; if(!q)return 0; var n=Math.min(q.length,64); var p=$0>>2; for(var i=0;i<n;i++)for(var j=0;j<13;j++)HEAP32[p+i*13+j]=q[i][j]??0; q.splice(0,n);return n; },  
+ 285353771: () => { Module.mapInputDiscard='changed-frame-geometry'; },  
+ 285353822: () => { Module.mapInputDiscard='pointer-left-rendered-frame'; },  
+ 285353878: ($0, $1, $2, $3, $4) => { Module.lastMapInputFrame=({type:$0,offset:[$1,$2],point:[$3,$4]}); },  
+ 285353947: () => { return Module.aimEdgeActive()?1:0; },  
+ 285353984: () => { Module.aimAck=null; },  
+ 285354006: ($0, $1, $2, $3, $4) => { var p={};p.type=$0;p.serial=$1;p.point=([$2,$3]);p.ready=$4;Module.aimInputProbe=p; },  
+ 285354092: () => { Module.shotPending=false; },  
+ 285354120: () => { Module.shotPending=true; },  
+ 285354147: () => { if(Module.menuQueue.length<16)Module.menuQueue.push([10,0]); },  
+ 285354210: ($0) => { Module.acceptSmoothDrag?.(false,$0); },  
+ 285354249: ($0) => { Module.acceptSmoothDrag?.(true,$0); },  
+ 285354287: ($0, $1) => { Module.acceptSmoothDrag?.(!!$0,$1); },  
+ 285354325: ($0, $1, $2) => { Module.lastMapGesture={};Module.lastMapGesture.pan=!!$0;Module.lastMapGesture.x=$1;Module.lastMapGesture.y=$2; },  
+ 285354438: () => { Module.shotPending=false; },  
+ 285354466: () => { var old=!!Module.fundsCheck;Module.fundsCheck=true;return old; },  
+ 285354531: ($0) => { Module.fundsCheck=!!$0; },  
+ 285354557: () => { if(Module.setAimMode)Module.setAimMode(false);else Module.cancelMapGesture?.(); Module.tournamentBoard=null;Module.tournamentDraft=null;Module.menuQueue=[];Module.shotPending=false;Module.mapCourseReady=false;Module.atTitle=true;Module.mobileNotification=null;Module.mobilePhotoCaption=null;Module.snapshotPhotoCaption=null;Module.photoCaptionStack=[];Module.photoRenderSerial=0;Module.roundHUD=null; if(Module.mobileState){Module.mobileState.course=false;Module.mobileState.wasCourse=false;Module.mobileState.roundActive=false;} if(Module.mapPresentation){Module.mapPresentation.course=false;Module.mapPresentation.pendingNative=null;} Module.refreshCanvasPresentation?.(); },  
+ 285355236: () => { Module.atTitle=false; },  
+ 285355260: ($0, $1, $2, $3, $4) => { if(!Module.panVisual?.atomic)return -1; var p=Module.smoothPanRequest; if(!p||p.serial!==$0||p.rotation!==$1||p.zoom!==$2||p.width!==$3||p.height!==$4)return 0; if(!Number.isInteger(p.x)||!Number.isInteger(p.y)||p.x<0||p.x>49||p.y<0||p.y>49)return 0; return 1+p.x+p.y*50; },  
+ 285355536: () => { Module.profileQueue=[]; },  
+ 285355562: () => { Module.profileQueue=[];Module.profileState=null; },  
+ 285355613: ($0, $1, $2, $3) => { Module.originalChoice=({left:$0,top:$1,right:$2,selected:$3,text:Module.readGameText(0x51a068,4096),time:performance.now()}); },  
+ 285355741: () => { Module.profileState=null; },  
+ 285355769: ($0) => { var q=Module.profileQueue;if(!q?.length)return 0;var c=q.shift();for(var i=0;i<3;i++)HEAP32[($0>>2)+i]=c[i];return 1; },  
+ 285355889: () => { Module.profileQueue=[]; },  
+ 285355915: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) => { var p=$0;var s=({active:true,kind:$1,serial:$2,frame:$3,profile:$4,actor:$5,total:$6,spent:$7,remaining:$8,fallback:!!$9,busy:!!$10,title:Module.readGameText($11,2048),skills:[],base:[],names:[]}); s.name=Module.readGameText(0x4d6098,16);s.profession=Module.readGameText(0x4d6088,16); for(var i=0;i<10;i++){s.names.push(Module.readGameText(HEAPU32[(0x4c2c3c>>2)+i],100));s.base.push(HEAPU8[p+i]);var a=s.kind===2?(s.actor<0||HEAP16[(0x57956e+s.actor*256)>>1]===0?0x5a5a04+i:0x5795a8+s.actor*256+i):0x5a5a04+i;s.skills.push(HEAPU8[a]);} s.traits=(['Neat','Outgoing','Active','Playful','Nice']).map(function(name,i){return {name:name,active:!!(HEAPU8[0x4d60a8]&(1<<i))};}); s.appearance=Array.from(HEAPU8.subarray(0x4d60a8,0x4d60b8)); if(s.kind===1||s.kind===2){ var gender=(HEAPU8[0x4d60a9]&128)?0:1;var face=HEAPU8[0x4d60aa];var body=(HEAPU8[0x4d60ab]>>4)&3; var child=!!(HEAPU8[0x4d60b4]&8);var expression=0; s.artParts=([({art:0x5439e0+(body+(child?4:0)+gender*8)*44,x:355,y:116,palette:HEAPU32[0x81ca14>>2]}),({art:face<20?0x59e7c0+((face+gender*20)*3+expression)*44:0x5628e8+((face+gender*72)*3+expression)*44,x:face<20?336:316,y:20})]); } if(s.kind===4){s.facePage=HEAP32[0x5aa55c>>2];s.faceCount=HEAP32[(0x59b76c>>2)+s.actor];s.faces=[];for(var i=0;i<10&&s.facePage+i<s.faceCount;i++)s.faces.push(({item:i,index:s.facePage+i,art:0x562914+(s.facePage+s.actor*72+i)*132}));} s.pointer=([$10,$12,$13,$14,$15]);Module.profileState=s; },  
+ 285357355: ($0) => { if(Module.profileState)Module.profileState.clubhouseDemolition=!!$0; },  
+ 285357426: ($0, $1, $2, $3, $4, $5, $6) => { const s=Module.progressScreen;if(s?.serial===$0&&s.lines.length<128)s.lines.push({text:Module.readGameText($1,$2),x:$3,y:$4,alignment:$5,color:$6>>>0}); },  
+ 285357581: ($0, $1, $2) => { Module.renderProgressScreen?.($0,$1,$2); },  
+ 285357624: ($0) => { Module.suspendProgressScreen?.($0); },  
+ 285357662: ($0) => { const q=Module.progressScreenQueue;if(!q?.length)return 0;const c=q.shift();return c[0]===$0&&c[1]===1; },  
+ 285357768: ($0) => { if(Module.progressScreen)Module.progressScreen.ackAttempts=$0; },  
+ 285357833: () => { return !!Module.beginProgressScreen; },  
+ 285357872: ($0, $1) => { return Module.beginProgressScreen($0,$1)?1:0; },  
+ 285357920: ($0) => { Module.endProgressScreen?.($0); },  
+ 285357954: () => { Module.snapshotLocksBalanced=(Module.snapshotLocksBalanced||0)+1; },  
+ 285358022: ($0, $1, $2, $3, $4) => { var q=Module.snapshotIO||(Module.snapshotIO=[]);q.push({path:UTF8ToString($0),result:$1,write:!!$2,width:$3,height:$4,time:Date.now()});if(q.length>32)q.shift(); },  
+ 285358186: ($0, $1, $2, $3, $4) => { var point=Module.soundDebug?.mapPosition($0,$1,$2); if(!point)return 0; HEAP32[$3>>2]=point[0];HEAP32[$4>>2]=point[1];return 1; },  
+ 285358318: ($0, $1, $2, $3, $4) => { Module.gameClock=({speed:$0,effectiveRate:$1,gameMs:$2,realMs:$3,held:!!$4}); },  
+ 285358398: ($0) => { Module.staffPlacement=({id:$0,name:Module.readGameText(0x58587a+$0*76,32)});Module.setAimMode(false);Module.setMapMode(0); },  
+ 285358523: () => { Module.staffHireQueue=[]; },  
+ 285358551: () => { Module.staffHire=null;Module.staffHireQueue=[]; },  
+ 285358601: ($0) => { Module.staffRenameOriginal=Module.readGameText(0x58587a+$0*76,32); },  
+ 285358670: () => { if(Module.staffPlacement&&HEAP32[0x4c2e10>>2]!==Module.staffPlacement.id)Module.staffPlacement=null; },  
+ 285358773: ($0) => { var q=Module.staffHireQueue;if(!q?.length)return 0;var c=q.shift();HEAP32[$0>>2]=c[0];HEAP32[($0>>2)+1]=c[1];return 1; },  
+ 285358894: () => { Module.staffHireQueue=[]; },  
+ 285358922: ($0, $1, $2, $3, $4, $5, $6) => { var art=$0;var read=Module.readGameText;var options=[]; for(var i=0;i<8;i++)options.push({item:i,name:read(HEAPU32[(0x4c148c>>2)+i],64).trim(),role:read(HEAPU32[(0x4c1464>>2)+i],64),weekly:HEAPU8[0x4c2e2c+i]*100,palette:HEAPU32[(0x81ca14+(0x82+(i>>1)+(i&1)*4)*88)>>2],art:HEAPU32[(art>>2)+i]}); Module.staffOptions=options; Module.staffHire=$1?({active:true,serial:$2,frame:$3,busy:!!$4,fallback:!!$5,options:options}):null; Module.staffRenaming=$6; },  
+ 285359376: () => { return Module.mobileUI&&!Module.atTitle&&!Module.mapCourseReady&&!Module.initialLoading?.complete&&!!Module.beginInitialLoading; },  
+ 285359507: ($0) => { Module.beginInitialLoading($0); },  
+ 285359541: ($0) => { Module.setInitialLoadingImage?.(UTF8ToString($0)); },  
+ 285359594: () => { Module.startupMenu=null;Module.startupQueue=[]; },  
+ 285359644: () => { return !!Module.atTitle; },  
+ 285359671: () => { Module.startupMenu=null;Module.startupQueue=[]; },  
+ 285359721: ($0) => { var q=Module.startupQueue;if(!q?.length)return 0;var c=q.shift();for(var i=0;i<3;i++)HEAP32[($0>>2)+i]=c[i];return 1; },  
+ 285359841: () => { Module.startupMenu=null;Module.startupQueue=[]; },  
+ 285359891: ($0) => { Module.startupResult=({kind:'difficulty',value:$0});Module.startupMenu=null;Module.startupQueue=[]; },  
+ 285359993: () => { return !!Module.atTitle; },  
+ 285360020: ($0, $1, $2, $3, $4, $5) => { Module.startupMenu=({active:true,kind:$0?'difficulty':'title',serial:$1,frame:$2,busy:!!$3,hover:$4,fallback:!!$5,theme:Module.readGameText(0x567328,128)}); },  
+ 285360179: () => { Module.terrainPreview=null; },  
+ 285360209: () => { return !!Module.terrainEdgeActive?.(); },  
+ 285360250: () => { return !!Module.terrainMode&&!Module.mobileState?.photoActive; },  
+ 285360315: ($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10) => { Module.terrainPreview=({serial:$0,tile:[$1,$2],point:[$3,$4],valid:!!$5,shape:$6,pending:$7,executed:$8,cursor:[$9,$10]});Module.refreshTerrainReticle?.(); },  
+ 285360473: () => { Module.mapCourseReady=true; },  
+ 285360503: () => { return Module.viewportRequest?.seq || 0; },  
+ 285360548: () => { return Module.viewportRequest.width; },  
+ 285360589: () => { return Module.viewportRequest.height; },  
+ 285360631: () => { if (Module.cancelMapGesture) Module.cancelMapGesture(); },  
+ 285360691: ($0, $1, $2, $3, $4) => { var result = {}; result.seq=$0; result.status=$1; result.reason=UTF8ToString($2); result.width=$3; result.height=$4; Module.viewportResize=result; },  
+ 285360842: ($0) => { var str = UTF8ToString($0) + '\n\n' + 'Abort/Retry/Ignore/AlwaysIgnore? [ariA] :'; var reply = window.prompt(str, "i"); if (reply === null) { reply = "i"; } return reply.length === 1 ? reply.charCodeAt(0) : -1; },  
+ 285361057: () => { if (typeof(AudioContext) !== 'undefined') { return true; } else if (typeof(webkitAudioContext) !== 'undefined') { return true; } return false; },  
+ 285361204: () => { if ((typeof(navigator.mediaDevices) !== 'undefined') && (typeof(navigator.mediaDevices.getUserMedia) !== 'undefined')) { return true; } else if (typeof(navigator.webkitGetUserMedia) !== 'undefined') { return true; } return false; },  
+ 285361438: ($0) => { if(typeof(Module['SDL2']) === 'undefined') { Module['SDL2'] = {}; } var SDL2 = Module['SDL2']; if (!$0) { SDL2.audio = {}; } else { SDL2.capture = {}; } if (!SDL2.audioContext) { if (typeof(AudioContext) !== 'undefined') { SDL2.audioContext = new AudioContext(); } else if (typeof(webkitAudioContext) !== 'undefined') { SDL2.audioContext = new webkitAudioContext(); } if (SDL2.audioContext) { if ((typeof navigator.userActivation) === 'undefined') { autoResumeAudioContext(SDL2.audioContext); } } } return SDL2.audioContext === undefined ? -1 : 0; },  
+ 285361990: () => { var SDL2 = Module['SDL2']; return SDL2.audioContext.sampleRate; },  
+ 285362058: ($0, $1, $2, $3) => { var SDL2 = Module['SDL2']; var have_microphone = function(stream) { if (SDL2.capture.silenceTimer !== undefined) { clearInterval(SDL2.capture.silenceTimer); SDL2.capture.silenceTimer = undefined; SDL2.capture.silenceBuffer = undefined } SDL2.capture.mediaStreamNode = SDL2.audioContext.createMediaStreamSource(stream); SDL2.capture.scriptProcessorNode = SDL2.audioContext.createScriptProcessor($1, $0, 1); SDL2.capture.scriptProcessorNode.onaudioprocess = function(audioProcessingEvent) { if ((SDL2 === undefined) || (SDL2.capture === undefined)) { return; } audioProcessingEvent.outputBuffer.getChannelData(0).fill(0.0); SDL2.capture.currentCaptureBuffer = audioProcessingEvent.inputBuffer; dynCall('vp', $2, [$3]); }; SDL2.capture.mediaStreamNode.connect(SDL2.capture.scriptProcessorNode); SDL2.capture.scriptProcessorNode.connect(SDL2.audioContext.destination); SDL2.capture.stream = stream; }; var no_microphone = function(error) { }; SDL2.capture.silenceBuffer = SDL2.audioContext.createBuffer($0, $1, SDL2.audioContext.sampleRate); SDL2.capture.silenceBuffer.getChannelData(0).fill(0.0); var silence_callback = function() { SDL2.capture.currentCaptureBuffer = SDL2.capture.silenceBuffer; dynCall('vp', $2, [$3]); }; SDL2.capture.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1000); if ((navigator.mediaDevices !== undefined) && (navigator.mediaDevices.getUserMedia !== undefined)) { navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(have_microphone).catch(no_microphone); } else if (navigator.webkitGetUserMedia !== undefined) { navigator.webkitGetUserMedia({ audio: true, video: false }, have_microphone, no_microphone); } },  
+ 285363751: ($0, $1, $2, $3) => { var SDL2 = Module['SDL2']; SDL2.audio.scriptProcessorNode = SDL2.audioContext['createScriptProcessor']($1, 0, $0); SDL2.audio.scriptProcessorNode['onaudioprocess'] = function (e) { if ((SDL2 === undefined) || (SDL2.audio === undefined)) { return; } if (SDL2.audio.silenceTimer !== undefined) { clearInterval(SDL2.audio.silenceTimer); SDL2.audio.silenceTimer = undefined; SDL2.audio.silenceBuffer = undefined; } SDL2.audio.currentOutputBuffer = e['outputBuffer']; dynCall('vp', $2, [$3]); }; SDL2.audio.scriptProcessorNode['connect'](SDL2.audioContext['destination']); if (SDL2.audioContext.state === 'suspended') { SDL2.audio.silenceBuffer = SDL2.audioContext.createBuffer($0, $1, SDL2.audioContext.sampleRate); SDL2.audio.silenceBuffer.getChannelData(0).fill(0.0); var silence_callback = function() { if ((typeof navigator.userActivation) !== 'undefined') { if (navigator.userActivation.hasBeenActive) { SDL2.audioContext.resume(); } } SDL2.audio.currentOutputBuffer = SDL2.audio.silenceBuffer; dynCall('vp', $2, [$3]); SDL2.audio.currentOutputBuffer = undefined; }; SDL2.audio.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1000); } },  
+ 285364926: ($0, $1) => { var SDL2 = Module['SDL2']; var numChannels = SDL2.capture.currentCaptureBuffer.numberOfChannels; for (var c = 0; c < numChannels; ++c) { var channelData = SDL2.capture.currentCaptureBuffer.getChannelData(c); if (channelData.length != $1) { throw 'Web Audio capture buffer length mismatch! Destination size: ' + channelData.length + ' samples vs expected ' + $1 + ' samples!'; } if (numChannels == 1) { for (var j = 0; j < $1; ++j) { setValue($0 + (j * 4), channelData[j], 'float'); } } else { for (var j = 0; j < $1; ++j) { setValue($0 + (((j * numChannels) + c) * 4), channelData[j], 'float'); } } } },  
+ 285365531: ($0, $1) => { var SDL2 = Module['SDL2']; var buf = $0 >>> 2; var numChannels = SDL2.audio.currentOutputBuffer['numberOfChannels']; for (var c = 0; c < numChannels; ++c) { var channelData = SDL2.audio.currentOutputBuffer['getChannelData'](c); if (channelData.length != $1) { throw 'Web Audio output buffer length mismatch! Destination size: ' + channelData.length + ' samples vs expected ' + $1 + ' samples!'; } for (var j = 0; j < $1; ++j) { channelData[j] = HEAPF32[buf + (j*numChannels + c)]; } } },  
+ 285366020: ($0) => { var SDL2 = Module['SDL2']; if ($0) { if (SDL2.capture.silenceTimer !== undefined) { clearInterval(SDL2.capture.silenceTimer); } if (SDL2.capture.stream !== undefined) { var tracks = SDL2.capture.stream.getAudioTracks(); for (var i = 0; i < tracks.length; i++) { SDL2.capture.stream.removeTrack(tracks[i]); } } if (SDL2.capture.scriptProcessorNode !== undefined) { SDL2.capture.scriptProcessorNode.onaudioprocess = function(audioProcessingEvent) {}; SDL2.capture.scriptProcessorNode.disconnect(); } if (SDL2.capture.mediaStreamNode !== undefined) { SDL2.capture.mediaStreamNode.disconnect(); } SDL2.capture = undefined; } else { if (SDL2.audio.scriptProcessorNode != undefined) { SDL2.audio.scriptProcessorNode.disconnect(); } if (SDL2.audio.silenceTimer !== undefined) { clearInterval(SDL2.audio.silenceTimer); } SDL2.audio = undefined; } if ((SDL2.audioContext !== undefined) && (SDL2.audio === undefined) && (SDL2.capture === undefined)) { SDL2.audioContext.close(); SDL2.audioContext = undefined; } },  
+ 285367026: ($0, $1, $2) => { var w = $0; var h = $1; var pixels = $2; if (!Module['SDL2']) Module['SDL2'] = {}; var SDL2 = Module['SDL2']; if (SDL2.ctxCanvas !== Module['canvas']) { SDL2.ctx = Browser.createContext(Module['canvas'], false, true); SDL2.ctxCanvas = Module['canvas']; } if (SDL2.w !== w || SDL2.h !== h || SDL2.imageCtx !== SDL2.ctx) { SDL2.image = SDL2.ctx.createImageData(w, h); SDL2.w = w; SDL2.h = h; SDL2.imageCtx = SDL2.ctx; } var data = SDL2.image.data; var src = pixels / 4; var dst = 0; var num; if (typeof CanvasPixelArray !== 'undefined' && data instanceof CanvasPixelArray) { num = data.length; while (dst < num) { var val = HEAP32[src]; data[dst ] = val & 0xff; data[dst+1] = (val >> 8) & 0xff; data[dst+2] = (val >> 16) & 0xff; data[dst+3] = 0xff; src++; dst += 4; } } else { if (SDL2.data32Data !== data) { SDL2.data32 = new Int32Array(data.buffer); SDL2.data8 = new Uint8Array(data.buffer); SDL2.data32Data = data; } var data32 = SDL2.data32; num = data32.length; data32.set(HEAP32.subarray(src, src + num)); var data8 = SDL2.data8; var i = 3; var j = i + 4*num; if (num % 8 == 0) { while (i < j) { data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; } } else { while (i < j) { data8[i] = 0xff; i = i + 4 | 0; } } } SDL2.ctx.putImageData(SDL2.image, 0, 0); },  
+ 285368492: ($0, $1, $2, $3, $4) => { var w = $0; var h = $1; var hot_x = $2; var hot_y = $3; var pixels = $4; var canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h; var ctx = canvas.getContext("2d"); var image = ctx.createImageData(w, h); var data = image.data; var src = pixels / 4; var dst = 0; var num; if (typeof CanvasPixelArray !== 'undefined' && data instanceof CanvasPixelArray) { num = data.length; while (dst < num) { var val = HEAP32[src]; data[dst ] = val & 0xff; data[dst+1] = (val >> 8) & 0xff; data[dst+2] = (val >> 16) & 0xff; data[dst+3] = (val >> 24) & 0xff; src++; dst += 4; } } else { var data32 = new Int32Array(data.buffer); num = data32.length; data32.set(HEAP32.subarray(src, src + num)); } ctx.putImageData(image, 0, 0); var url = hot_x === 0 && hot_y === 0 ? "url(" + canvas.toDataURL() + "), auto" : "url(" + canvas.toDataURL() + ") " + hot_x + " " + hot_y + ", auto"; var urlBuf = _malloc(url.length + 1); stringToUTF8(url, urlBuf, url.length + 1); return urlBuf; },  
+ 285369480: ($0) => { if (Module['canvas']) { Module['canvas'].style['cursor'] = UTF8ToString($0); } },  
+ 285369563: () => { if (Module['canvas']) { Module['canvas'].style['cursor'] = 'none'; } },  
+ 285369632: () => { return window.innerWidth; },  
+ 285369662: () => { return window.innerHeight; }
 };
 function __asyncjs__js_fetch_game_file(rel,dest) { return Asyncify.handleAsync(async () => { const r = UTF8ToString(rel); const d = UTF8ToString(dest); const url = 'game/' + r.split('/').map(encodeURIComponent).join('/'); if (Module.fsDebug) console.log('fetch ' + url); try { const resp = await fetch(url); if (!resp.ok) { console.warn('fetch ' + url + ': ' + resp.status); return 0; } const buf = new Uint8Array(await resp.arrayBuffer()); FS.writeFile(d, buf); return 1; } catch (e) { console.warn('fetch ' + url + ': ' + e); return 0; } }); }
 __asyncjs__js_fetch_game_file.sig = 'iii';
@@ -10576,6 +10700,8 @@ function __asyncjs__port_play_original_bink(path,background) { return Asyncify.h
 __asyncjs__port_play_original_bink.sig = 'vii';
 function port_no_videos() { return Module['noVideos'] ? 1 : 0; }
 port_no_videos.sig = 'i';
+function __asyncjs__course_loading_wait_for_enter() { return Asyncify.handleAsync(async () => { while(Module.courseLoading?.active&&Module.courseLoading.readyToContinue&&!Module.courseLoading.enterRequested)await new Promise(resolve=>setTimeout(resolve,32)); }); }
+__asyncjs__course_loading_wait_for_enter.sig = 'v';
 
 // Imports from the Wasm binary.
 var _main = Module['_main'] = makeInvalidEarlyAccess('_main');
@@ -10626,6 +10752,8 @@ function assignWasmExports(wasmExports) {
 var wasmImports = {
   /** @export */
   __assert_fail: ___assert_fail,
+  /** @export */
+  __asyncjs__course_loading_wait_for_enter,
   /** @export */
   __asyncjs__js_fetch_game_file,
   /** @export */

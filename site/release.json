@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "build": "alpha120-release-v1-20261030T014221Z",
+  "build": "alpha130-release-v1-20261103T131953Z",
   "files": [
     {
       "path": "7zz.umd.js",
@@ -34,8 +34,8 @@
     },
     {
       "path": "autosave.js",
-      "bytes": 14417,
-      "sha256": "4d2ca4ce6909b4b6d23b77cf53e323a15e158567062954b2224ce26185d412a8"
+      "bytes": 14766,
+      "sha256": "6f7ead9ab611352766e1e0798c0745cd415b6833d51b9b9b1bda74b5b015e29b"
     },
     {
       "path": "bink-video-worker.js",
@@ -44,8 +44,8 @@
     },
     {
       "path": "bink-video.js",
-      "bytes": 5275,
-      "sha256": "69d6f718d20bf6045ea81cbcc18047d751fa5a09633dc561ce04e41193ccddfd"
+      "bytes": 5356,
+      "sha256": "990c9971b62d96492f142d2ef2d80913f5b6bb7484008d127b523e9c0b23d40a"
     },
     {
       "path": "bink.js",
@@ -69,18 +69,18 @@
     },
     {
       "path": "golf.html",
-      "bytes": 70204,
-      "sha256": "e837ba2bf61e1cce487e8612877c3a577383656a09644de4e7d42223e3dd71ac"
+      "bytes": 81508,
+      "sha256": "57e6c73838c33ca68a5f2ea2462f118cf48e3e3e6c9ad744e0a47712df51300e"
     },
     {
       "path": "golf.js",
-      "bytes": 446313,
-      "sha256": "de6ff7c51fa530621242bc35a2c53a4d6c7b71a041384726158f853a8e7e7564"
+      "bytes": 460171,
+      "sha256": "19fbbeda078f2c6e8a92821de8b68e79a3b3b9ac81c729b6025e96a4c8095ede"
     },
     {
       "path": "golf.wasm",
-      "bytes": 3330304,
-      "sha256": "1fa0666083c375e1638b08b62fb5db1665ded7aac5423897476cd15b919267cf"
+      "bytes": 3374884,
+      "sha256": "a429fd98d3bf89a7dabf086d6b2578dd70f999d97311e4d44009811a7c7a7c69"
     },
     {
       "path": "icons/discord-symbol.svg",
@@ -189,28 +189,28 @@
     },
     {
       "path": "local-install.js",
-      "bytes": 28460,
-      "sha256": "6a55274823a0f3709d83490b11a01b26ad2e525b2fba6b2a61cdf7d24533270b"
+      "bytes": 60257,
+      "sha256": "d90d29786d32c3a44a5093a6c1da94853964b71a0c01e4d5520e54e0c43b7959"
     },
     {
       "path": "manifest.webmanifest",
       "bytes": 377,
-      "sha256": "992c177fc27189aa95dc0d49ccce6bdbc25e01b58840eb63fb08bc8721d7c687"
+      "sha256": "9bf9eaa98138ac8efee3f0733aae612c2486ed8782f989aa14332e771698f4dd"
     },
     {
       "path": "mobile-menu.js",
-      "bytes": 119897,
-      "sha256": "20b371cfe0731bfaf5d6e9f95b4318f1ff4a1ebdb9c92156a77ad6004aa21663"
+      "bytes": 245075,
+      "sha256": "c301c9605ccbb422990f67ff1a59dea391d4c9f3392904cb8d55b1a8e5e1def9"
     },
     {
       "path": "offline.js",
-      "bytes": 7142,
-      "sha256": "67fb8164095f69de0e3afcc6ed0539c84115927f989162deb0690e9c4bbcf281"
+      "bytes": 7205,
+      "sha256": "d93412e43904730ca22067fd0cf193e2755bc6e38894910b3aaab91433bb2078"
     },
     {
       "path": "service-worker.js",
       "bytes": 4004,
-      "sha256": "b94f87e4a139c38c063175b22d1c0f2ace73fafaa7039ee8a2580a2188279092"
+      "sha256": "cb2df6b2f1b27cbaf6cfe936e6ac3c6bdbc93149020d072d31429ca21e6fd50a"
     },
     {
       "path": "sources/7z-wasm-1.2.0-source.tar.gz",

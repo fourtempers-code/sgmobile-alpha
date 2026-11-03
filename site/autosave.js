@@ -1,10 +1,7 @@
 // Save history kept by the page, independent of the game's own save slots.
 //
-// The game autosaves every 512 game ticks (about 45 s of unpaused play) into
-// two alternating files, &AutoSave1 and &AutoSave2, and src/port/fs.c mirrors
-// everything it writes into IndexedDB. That leaves two gaps this file closes:
-// a bug that corrupts the game state overwrites both autosaves within a minute
-// and a half, and nothing outside the browser holds a copy.
+// Three rotating native autosaves run every180 seconds of active real play,
+// independently of game speed. Completed saves also enter this backup history.
 //
 // Every .sve the game finishes writing is copied into its own IndexedDB
 // database (a file the game was still writing when it crashed never gets
@@ -90,6 +87,7 @@
   function record(rel, data) {
     var name = rel.split('/').pop();
     if (!/\.sve$/i.test(name) || SKIP.test(name) || data.length < 1024) return;
+    if (/^&autosave[123]\.sve$/i.test(name)) Module.autosaveWriteSerial = (Module.autosaveWriteSerial || 0) + 1;
     var label = /^&autosave/i.test(name) ? 'Autosaved' : 'Saved';
     if (Module.localFiles && Module.persistFlush) {
       Module.persistFlush().then(function (ok) { toast(ok ? label : 'Local saving failed — export a backup'); });
@@ -106,7 +104,7 @@
   }
 
   // A short notice each time the game writes a save, so players can see
-  // autosave working (it only comes after ~45 s of unpaused play).
+  // autosave working (every180 seconds of active play).
   var toastEl = null, toastTimer = 0;
   function toast(text) {
     if (!toastEl) {
@@ -124,6 +122,11 @@
   // ---- page hooks
   var Module = window.Module;
   Module.saveHistoryUIEnabled = HISTORY_UI_ENABLED;
+  Module.saveHistory = Object.freeze({
+    list: function () { return queue.then(list); },
+    get: function (id) { return queue.then(function () { return get(id); }); },
+    recentLimit: KEEP_RECENT, olderLimit: KEEP_OLDER, olderSpacingMinutes: 30
+  });
   Module.onGameFileWritten = record;
   function flush() { if (Module.persistFlush) Module.persistFlush(); }
   addEventListener('pagehide', flush);
@@ -144,24 +147,24 @@
   var css = document.createElement('style');
   css.textContent =
     '#sv-btn{position:fixed;right:10px;bottom:10px;z-index:1000;font:12px system-ui,sans-serif;' +
-    'background:#222;color:#ddd;border:1px solid #444;border-radius:4px;padding:4px 9px;opacity:.4;cursor:pointer}' +
+    'background:var(--menu-button);color:var(--menu-text);border:1px solid var(--menu-border);border-radius:4px;padding:4px 9px;opacity:.4;cursor:pointer}' +
     '#sv-btn:hover{opacity:1}' +
     '#sv-panel{position:fixed;right:10px;bottom:42px;z-index:1000;width:min(380px,calc(100vw - 20px));' +
-    'max-height:70vh;overflow:auto;font:13px system-ui,sans-serif;background:#1b1b1b;color:#ddd;' +
-    'border:1px solid #444;border-radius:6px;padding:10px 12px;box-shadow:0 6px 24px #000a;display:none}' +
+    'max-height:70vh;overflow:auto;font:13px system-ui,sans-serif;background:var(--menu-bg);color:var(--menu-text);' +
+    'border:1px solid var(--menu-border);border-radius:6px;padding:10px 12px;box-shadow:0 6px 24px #000a;display:none}' +
     '#sv-panel h3{margin:0 0 6px;font-size:14px}' +
-    '#sv-panel .note{color:#aaa;margin:0 0 8px;line-height:1.35}' +
+    '#sv-panel .note{color:var(--menu-muted);margin:0 0 8px;line-height:1.35}' +
     '#sv-panel .crash{background:#4a1f1f;color:#fdd;padding:6px 8px;border-radius:4px;margin-bottom:8px;line-height:1.35}' +
-    '#sv-panel .row{display:flex;align-items:center;gap:6px;padding:4px 0;border-top:1px solid #2c2c2c}' +
+    '#sv-panel .row{display:flex;align-items:center;gap:6px;padding:4px 0;border-top:1px solid var(--menu-button)}' +
     '#sv-panel .row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-    '#sv-panel .row small{color:#888}' +
-    '#sv-panel button{font:12px system-ui,sans-serif;background:#2c2c2c;color:#ddd;border:1px solid #555;' +
+    '#sv-panel .row small{color:var(--menu-muted)}' +
+    '#sv-panel button{font:12px system-ui,sans-serif;background:var(--menu-button);color:var(--menu-text);border:1px solid var(--menu-border);' +
     'border-radius:3px;padding:2px 7px;cursor:pointer}' +
-    '#sv-panel button:hover{background:#3a3a3a}' +
+    '#sv-panel button:hover{background:var(--menu-selected)}' +
     '#sv-panel .bar{display:flex;gap:6px;margin-bottom:8px}' +
-    '#sv-msg{color:#9d9;margin:6px 0 0;min-height:1em}' +
+    '#sv-msg{color:var(--menu-good);margin:6px 0 0;min-height:1em}' +
     '#sv-toast{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:1001;pointer-events:none;' +
-    'font:13px system-ui,sans-serif;background:#1b1b1bd9;color:#cfc;border:1px solid #4a4;border-radius:12px;' +
+    'font:13px system-ui,sans-serif;background:var(--menu-overlay);color:var(--menu-text);border:1px solid var(--menu-border);border-radius:12px;' +
     'padding:3px 12px;opacity:0;transition:opacity .4s}' +
     '#sv-toast.on{opacity:1}';
   document.head.appendChild(css);
@@ -269,7 +272,7 @@
       }
       h += '<div class="bar"><button data-a="import">Import .sve…</button>' +
         (snaps.length ? '<button data-a="latest">Download newest</button>' : '') + '</div>';
-      if (!snaps.length) h += '<p class="note">Nothing yet. The game autosaves after about 45 seconds of play.</p>';
+      if (!snaps.length) h += '<p class="note">Nothing yet. The game autosaves after three minutes of active play.</p>';
       snaps.forEach(function (s) {
         h += '<div class="row"><span>' + esc(when(s.time)) + ' · ' + esc(label(s.name)) +
           ' <small>' + Math.round(s.size / 1024) + ' KB</small></span>' +

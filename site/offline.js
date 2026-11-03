@@ -4,7 +4,7 @@
   if (!Module.localFiles) return;
   Module.offlineState = {phase:'checking', build:null};
   var notice = document.createElement('div'); notice.id = 'offline-notice'; notice.hidden = true;
-  notice.style.cssText = 'position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:1001;background:#142219;color:#fff;border:1px solid #8ca68d;border-radius:8px;padding:12px;font:14px system-ui';
+  notice.style.cssText = 'position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:1001;background:var(--menu-bg);color:var(--menu-text);border:1px solid var(--menu-border);border-radius:8px;padding:12px;font:14px system-ui';
   var text = document.createElement('span'), close = document.createElement('button'); close.textContent = 'Dismiss'; close.style.cssText = 'margin-left:12px;min-height:44px'; close.onclick = function () { notice.hidden = true; };
   notice.append(text, close); document.body.append(notice);
   function state(phase, message, build) {
@@ -59,7 +59,7 @@
   };
   function addButton(parent,id,before){
     if(!parent)return;var button=document.createElement('button');button.id=id;button.textContent='Check for updates';button.type='button';
-    button.style.cssText='font:inherit;min-height:48px;padding:10px 14px;background:#385a39;color:white;border:1px solid #9ab69a;border-radius:8px;margin:6px 0';
+    button.style.cssText='font:inherit;min-height:48px;padding:10px 14px;background:var(--menu-button);color:var(--menu-text);border:1px solid var(--menu-border);border-radius:8px;margin:6px 0';
     button.onclick=Module.checkForUpdates;
     for(var type of ['pointerdown','pointerup','mousedown','mouseup','click','touchstart','touchmove','touchend','keydown','keyup','keypress'])button.addEventListener(type,function(e){e.stopPropagation();});
     parent.insertBefore(button,before||null);buttons.push(button);
