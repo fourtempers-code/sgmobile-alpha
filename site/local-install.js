@@ -114,6 +114,7 @@
   var links = node('p', ''); links.append(guide, document.createTextNode(' · '), notices);
   card.append(eyebrow, releaseVersion, donate, community, heading, intro, pickLabel, info, bar, quickGuide, help, play, replace, cancel, privacy, note);
   footer.append(links, identity); box.append(brand, card, footer); root.append(box); document.body.append(root);
+  Module.mountPublicUsage?.(releaseVersion, privacy);
   for (var type of ['pointerdown','pointerup','pointermove','mousedown','mouseup','click','touchstart','touchmove','touchend','wheel','keydown','keyup','keypress']) root.addEventListener(type, function (e) { e.stopPropagation(); });
 
   function status(phase, message, error) {

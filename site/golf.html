@@ -58,13 +58,13 @@
 </style>
 </head>
 <body>
-<div id="build-header"><div id="build-label" title="SimGolf Mobile Alpha version 1.3.0 · alpha130-release-v1-20261103T131953Z">v1.3.0</div><div id="mobile-status" hidden></div></div>
+<div id="build-header"><div id="build-label" title="SimGolf Mobile Alpha version 1.3.0 · alpha130-public-usage-v1-20261110T142120Z">v1.3.0</div><div id="mobile-status" hidden></div></div>
 <div id="safe-area-probe" aria-hidden="true"></div>
 <div id="game-stage"><canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas></div>
 <script>
   var Module = { canvas: document.getElementById('canvas'), fsDebug: true, apiTrace: /apitrace/.test(location.search), noVideos: /novideos/.test(location.search) };
   Module.localFiles = true;
-  Module.buildInfo = Object.freeze({version: 'alpha1.3.0', id: 'alpha130-release-v1-20261103T131953Z'});
+  Module.buildInfo = Object.freeze({version: 'alpha1.3.0', id: 'alpha130-public-usage-v1-20261110T142120Z'});
   // Choose at launch; the ready initial loader permits one last change before
   // Continue. Future changes are shared unless explicitly
   // registered as Enhanced-only; save storage and formats remain shared.
@@ -977,7 +977,7 @@
     Module.onAbort = function (what) { report('abort: ' + what + '\n' + new Error().stack); };
   })();
 </script>
-<script src="bink-video.js"></script><script src="local-install.js"></script><script src="offline.js"></script>
+<script src="bink-video.js"></script><script src="public-usage.js" data-endpoint="https://sgmobile-public-usage.sgmobile-fourtempers.workers.dev"></script><script src="local-install.js"></script><script src="offline.js"></script>
 <script src="autosave.js"></script>
 <script src="mobile-menu.js"></script>
 <script async type="text/javascript" src="golf.js"></script>

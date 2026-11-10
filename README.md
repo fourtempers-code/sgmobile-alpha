@@ -9,3 +9,7 @@ Players supply their own matching original SimGolf files locally. Original asset
 Existing public installations keep the same URL and Home Screen identity. Use Check for updates, then close and reopen when prompted. Keep save backups; do not clear browser data to update.
 
 Deployment is manual from main, verifies every site-file hash and uploads only site/. Private source development is separate. This remains alpha software; desktop engineering tests do not replace physical-phone acceptance.
+
+## Community usage pilot
+
+The current Alpha 1.3.0 web build shows aggregate course sessions and active course time on its welcome screen. The notice beside those counters describes the collection.
