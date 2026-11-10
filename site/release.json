@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "build": "alpha130-public-usage-v1-20261110T142120Z",
+  "build": "alpha130-public-usage-v2-20261110T144145Z",
   "files": [
     {
       "path": "7zz.umd.js",
@@ -70,7 +70,7 @@
     {
       "path": "golf.html",
       "bytes": 81636,
-      "sha256": "ab2fe973d4b18ef7ee3d15b16e70f57e41643a182f722b80af826a9f175535d1"
+      "sha256": "2664bc5f6f34bf9844fb6a39aa87a94f3f5e0d21c7d4c13ee14738a91a3ec05d"
     },
     {
       "path": "golf.js",
@@ -189,8 +189,8 @@
     },
     {
       "path": "local-install.js",
-      "bytes": 60311,
-      "sha256": "9c579bf9934e53570a3fcbb9bc01e6d2962adaec2d13664f47bff82eac237594"
+      "bytes": 60319,
+      "sha256": "4046c32581fb0453dcb8318dfb73d52fc03a8c1dbe3fa56b37dc586c0c835174"
     },
     {
       "path": "manifest.webmanifest",
@@ -209,13 +209,13 @@
     },
     {
       "path": "public-usage.js",
-      "bytes": 5943,
-      "sha256": "1fbc7ea4dda494b61fb28a897d5ec92ff1d11e905427fd238e215927d0f132f5"
+      "bytes": 7619,
+      "sha256": "8eb736af95b4ec041d167be08c5199a80f01682795e55861e0ba0aef7a016a7f"
     },
     {
       "path": "service-worker.js",
       "bytes": 4009,
-      "sha256": "33f21c3f98031d44bebfa3ed790733794c27f4eb706ad32d16874337d944517c"
+      "sha256": "8b762444988ab4dfe9ffcb9aa4f53cc3aeb60e66aee466e5fc13ce318510a094"
     },
     {
       "path": "sources/7z-wasm-1.2.0-source.tar.gz",

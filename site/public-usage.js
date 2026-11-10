@@ -106,23 +106,54 @@
     void send();
   }
 
-  Module.mountPublicUsage = (version, privacy) => {
-    const total = document.createElement('p');
+  Module.mountPublicUsage = (version, privacy, footer) => {
+    const style = document.createElement('style');
+    style.textContent = `
+      #public-usage-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 18px}
+      #public-usage-totals>div{display:grid;grid-template-rows:1fr auto;gap:4px;padding:10px 6px;
+        border:1px solid var(--menu-border);border-radius:16px;background:linear-gradient(#f4f5ff,#e0e5fa);
+        box-shadow:0 2px 0 #39315d20;color:var(--menu-text)}
+      #public-usage-totals>div+div{background:linear-gradient(#fffaf0,#f7ebca)}
+      #public-usage-totals dt{display:flex;flex-direction:column;align-items:center;justify-content:start;
+        gap:4px;font-size:12px;font-weight:750;line-height:1.25}
+      #public-usage-totals svg{width:20px;height:20px;color:var(--menu-accent)}
+      #public-usage-totals>div+div svg{color:var(--menu-warning)}
+      #public-usage-totals dd{margin:0;font-size:clamp(21px,6vw,29px);font-weight:850;
+        line-height:1.1;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+      #local-install .install-footer .install-privacy{max-width:440px;margin:14px auto 0}
+    `;
+    document.head.append(style);
+    const total = document.createElement('dl');
     total.id = 'public-usage-totals';
-    total.className = 'minor';
     total.hidden = true;
-    total.style.fontWeight = '700';
-    privacy.style.margin = '0 0 16px';
-    version.after(total, privacy);
+    total.innerHTML = `
+      <div>
+        <dt><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 20V4l12 4-12 4M3 20h8"/>
+        </svg>SG Mobile Sessions</dt>
+        <dd></dd>
+      </div>
+      <div>
+        <dt><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3 2"/>
+        </svg>Hours Played</dt>
+        <dd></dd>
+      </div>
+    `;
+    const [sessionValue, hoursValue] = total.querySelectorAll('dd');
+    version.after(total);
     privacy.textContent = 'Game files and saves stay on this device. Public builds report course sessions, play time, build version, Home Screen or browser launch, and broad device and browser categories.';
+    footer.append(privacy);
     request('/totals', { signal: AbortSignal.timeout?.(5000) }).then(async response => {
       if (!response.ok) return;
       const { sessions, seconds } = await response.json();
       if (!Number.isSafeInteger(sessions) || sessions < 0 ||
           !Number.isSafeInteger(seconds) || seconds < 0) return;
       const hours = Number((seconds / 3600).toFixed(1));
-      total.textContent = sessions.toLocaleString() + (sessions === 1 ? ' course session' : ' course sessions') +
-        ' · ' + hours.toLocaleString() + (hours === 1 ? ' hour on the course' : ' hours on the course');
+      sessionValue.textContent = sessions.toLocaleString();
+      hoursValue.textContent = hours.toLocaleString();
       total.hidden = false;
     }).catch(() => {});
   };

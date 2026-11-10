@@ -12,4 +12,4 @@ Deployment is manual from main, verifies every site-file hash and uploads only s
 
 ## Community usage pilot
 
-The current Alpha 1.3.0 web build shows aggregate course sessions and active course time on its welcome screen. The notice beside those counters describes the collection.
+The current Alpha 1.3.0 web build shows SG Mobile Sessions and Hours Played on its welcome screen. The notice at the bottom describes the collection.
