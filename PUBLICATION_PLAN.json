@@ -1,9 +1,9 @@
 {
   "repository": "fourtempers-code/sgmobile-alpha",
   "prospective_url": "https://fourtempers-code.github.io/sgmobile-alpha/",
-  "build": "alpha130-public-usage-v2-20261110T144145Z",
+  "build": "alpha130-beta-announcement-v1-20261113",
   "site_files": 52,
-  "bytes": 25134792,
+  "bytes": 25139483,
   "public_repository_proposed": true,
   "publishing_performed": false,
   "approval_required": true,

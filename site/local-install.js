@@ -62,6 +62,25 @@
     #local-install .install-setup ol{margin:10px 0;padding-left:22px}
     #local-install .install-setup li{margin:10px 0;overflow-wrap:anywhere}
     #local-install .install-setup a{font-weight:700}
+    #local-install #alpha-beta-announcement{margin:0 0 22px;padding:clamp(14px,4vw,22px);box-sizing:border-box;text-align:left;color:#193629;background:linear-gradient(155deg,#fcfdf5,#e7f0df);border:1px solid #8fa695;border-radius:19px;box-shadow:0 3px 0 #38544025}
+    #alpha-beta-announcement h2{font-size:clamp(20px,5.8vw,28px);line-height:1.14;letter-spacing:-.032em;margin:0}
+    #local-install #alpha-beta-announcement p{font-size:14px;line-height:1.46;margin:8px 0 12px}
+    #local-install #alpha-beta-announcement .alpha-beta-play{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:48px;box-sizing:border-box;padding:9px 13px;border:1px solid #183f32;border-radius:11px;background:linear-gradient(#295c46,#214b3b);color:#fff;text-decoration:none;font-weight:780;line-height:1.2}
+    #alpha-beta-announcement .alpha-beta-play:active{background:#183e30}
+    #local-install #alpha-beta-announcement .alpha-beta-stay{font-size:12px;color:#385448;margin:8px 0 9px}
+    #alpha-beta-announcement details{border-top:1px solid #9caf9b}
+    #alpha-beta-announcement summary{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:5px 0;box-sizing:border-box;font-weight:750;font-size:14px;line-height:1.25;cursor:pointer;list-style:none}
+    #alpha-beta-announcement summary::-webkit-details-marker{display:none}
+    #alpha-beta-announcement summary::after{content:"";width:7px;height:7px;border:solid currentColor;border-width:0 2px 2px 0;transform:rotate(45deg);margin:0 4px 4px 0;flex:none}
+    #alpha-beta-announcement details[open] summary::after{transform:rotate(225deg);margin-bottom:0}
+    #alpha-beta-announcement summary:focus-visible{outline:3px solid #275b45;outline-offset:2px;border-radius:5px}
+    #alpha-beta-announcement ol{margin:0;padding-left:24px;font-size:14px;line-height:1.48}
+    #alpha-beta-announcement li{padding-left:3px;margin:0 0 11px}
+    #alpha-beta-announcement li::marker{font-weight:800;color:#285540}
+    #alpha-beta-announcement li strong{display:block;margin-bottom:2px}
+    #alpha-beta-announcement li b{font-weight:650}
+    #alpha-beta-announcement code{font-size:13px;color:#193629}
+    #local-install #alpha-beta-announcement .alpha-beta-note{margin:12px 0 0;padding:10px 11px;border:1px solid #b2c4b2;border-radius:9px;background:#fffdf4;font-size:12px}
     #local-install .install-version{font-size:12px;line-height:1.4;color:var(--menu-muted);margin:-6px 0 16px}
     #local-install .install-identity{overflow-wrap:anywhere;font-size:11px}
     @media(max-height:500px){#local-install .install-brand{margin-bottom:14px}#local-install .install-brand img{width:60px;height:60px;border-radius:15px}#local-install .install-card{padding:20px}}
@@ -112,7 +131,9 @@
   var guide = node('a', 'Setup & supported files'); guide.href = new URL('README.txt', base).href; guide.target = '_blank'; guide.rel = 'noopener';
   var notices = node('a', 'Third-party notices & source'); notices.href = new URL('THIRD_PARTY_NOTICES.txt', base).href; notices.target = '_blank'; notices.rel = 'noopener';
   var links = node('p', ''); links.append(guide, document.createTextNode(' · '), notices);
-  card.append(eyebrow, releaseVersion, donate, community, heading, intro, pickLabel, info, bar, quickGuide, help, play, replace, cancel, privacy, note);
+  var announcement = document.createElement('template');
+  announcement.innerHTML = "<section id=\"alpha-beta-announcement\" aria-labelledby=\"alpha-beta-heading\">\n  <h2 id=\"alpha-beta-heading\">SGMobile Beta 1.0 is here!</h2>\n  <p>Try Enhanced Mode, new course-building tools, course analytics, and redesigned mobile menus.</p>\n  <a class=\"alpha-beta-play\" href=\"https://sgmobile-beta.github.io/\" target=\"_blank\" rel=\"noopener noreferrer\">Play SGMobile Beta <span aria-hidden=\"true\">↗</span></a>\n  <p class=\"alpha-beta-stay\">You can keep playing Alpha 1.3 here.</p>\n  <details>\n    <summary>How to transfer your saves</summary>\n    <div class=\"alpha-beta-steps\">\n      <p>Alpha and Beta store game files and saves separately. Export a copy from Alpha and import it into Beta. The original stays in Alpha.</p>\n      <ol>\n        <li><strong>Export your save in Alpha.</strong> Save your progress if needed. From the course, open <b>Menu → Save files / backup</b>. From the title screen, use <b>Save files</b>. Find your career under <b>Saved games</b> and tap <b>Save to…</b> or <b>Download</b>. On iPhone, choose <b>Save to Files</b> if the share sheet opens. Keep the exported <code>.sve</code>.</li>\n        <li><strong>Set up Beta.</strong> Open the Beta link above and tap <b>Choose Game Files</b> to install your original SimGolf game files on the Beta site.</li>\n        <li><strong>Import the save.</strong> In Beta, tap <b>Play</b> and <b>Proceed</b> if the Changelog appears. Open <b>Backup &amp; Transfer Files → Import from Files…</b> and select the <code>.sve</code>. Once it imports, tap <b>Back to game</b>.</li>\n        <li><strong>Open your course.</strong> Tap <b>Load A Saved Game</b>, select the imported save, then tap <b>Load selected game → Enter course</b>. Choose <b>Create Classic Copy</b> for original gameplay or <b>Create Enhanced Copy</b> to choose enhancements. If you choose Enhanced, select your options and tap <b>Continue</b>.</li>\n      </ol>\n      <p class=\"alpha-beta-note\">Keep the original career in Alpha and the exported file in Files or Downloads. If you’re moving a newer Enhanced career, use a portable <code>.sgsave</code> from that build to keep its settings and history.</p>\n    </div>\n  </details>\n</section>";
+  card.append(eyebrow, releaseVersion, announcement.content, donate, community, heading, intro, pickLabel, info, bar, quickGuide, help, play, replace, cancel, privacy, note);
   footer.append(links, identity); box.append(brand, card, footer); root.append(box); document.body.append(root);
   Module.mountPublicUsage?.(releaseVersion, privacy, footer);
   for (var type of ['pointerdown','pointerup','pointermove','mousedown','mouseup','click','touchstart','touchmove','touchend','wheel','keydown','keyup','keypress']) root.addEventListener(type, function (e) { e.stopPropagation(); });

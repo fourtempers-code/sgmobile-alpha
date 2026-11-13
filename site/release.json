@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "build": "alpha130-public-usage-v2-20261110T144145Z",
+  "build": "alpha130-beta-announcement-v1-20261113",
   "files": [
     {
       "path": "7zz.umd.js",
@@ -189,8 +189,8 @@
     },
     {
       "path": "local-install.js",
-      "bytes": 60319,
-      "sha256": "4046c32581fb0453dcb8318dfb73d52fc03a8c1dbe3fa56b37dc586c0c835174"
+      "bytes": 65016,
+      "sha256": "8f7ef4125f3ce09dd3f81ff8f9778c6276125636044c08444c50c7c0321809a9"
     },
     {
       "path": "manifest.webmanifest",
@@ -214,8 +214,8 @@
     },
     {
       "path": "service-worker.js",
-      "bytes": 4009,
-      "sha256": "8b762444988ab4dfe9ffcb9aa4f53cc3aeb60e66aee466e5fc13ce318510a094"
+      "bytes": 4006,
+      "sha256": "38540ab933d78887a040d47d566ac17f4b8542bac1d8c1858516b0e7f001c9ea"
     },
     {
       "path": "sources/7z-wasm-1.2.0-source.tar.gz",
